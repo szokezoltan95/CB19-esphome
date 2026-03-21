@@ -1,0 +1,18 @@
+external_components:
+  - source: github://szokezoltan95/CB19-esphome
+    components: [cb19_gate]
+
+uart:
+  id: gate_uart
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 9600
+
+cb19_gate:
+  id: gate1
+  uart_id: gate_uart
+
+cover:
+  - platform: cb19_gate
+    name: "Gate"
+    gate_id: gate1
