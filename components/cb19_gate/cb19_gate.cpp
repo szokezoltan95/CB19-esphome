@@ -64,7 +64,7 @@ void CB19GateComponent::stop_gate() { this->send_command_("STOP"); }
 void CB19GateComponent::pedestrian_open() { this->send_command_("PED OPEN"); }
 
 void CB19GateComponent::send_command_(const std::string &cmd) {
-  std::string full = cmd + "\r\n";
+  std::string full = cmd + ";src=P0031DA2\r\n";
 
   ESP_LOGI(TAG, "TX RAW: [%s]", full.c_str());
 
