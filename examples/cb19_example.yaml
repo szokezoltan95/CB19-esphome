@@ -1,5 +1,36 @@
+esphome:
+  name: cb19-gate
+  friendly_name: CB19 Gate
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  baud_rate: 0
+
+api:
+
+ota:
+  - platform: esphome
+    password: "admin123"
+
+wifi:
+  ssid: "YOUR_SSID"
+  password: "YOUR_WIFI_PASSWORD"
+
+  ap:
+    ssid: "CB19 Gate Fallback"
+    password: "12345678"
+
+captive_portal:
+
 external_components:
-  - source: github://szokezoltan95/CB19-esphome
+  - source:
+      type: git
+      url: https://github.com/szokezoltan95/CB19-esphome
+      ref: main
     components: [cb19_gate]
 
 uart:
@@ -9,10 +40,50 @@ uart:
   baud_rate: 9600
 
 cb19_gate:
-  id: gate1
+  id: gate_controller
   uart_id: gate_uart
 
-cover:
-  - platform: cb19_gate
+  cover:
     name: "Gate"
-    gate_id: gate1
+
+  pedestrian_button:
+    name: "Pedestrian Open"
+
+  motor1_raw:
+    name: "Motor1 Raw"
+
+  motor2_raw:
+    name: "Motor2 Raw"
+
+  motor1_percent:
+    name: "Motor1 Position"
+
+  motor2_percent:
+    name: "Motor2 Position"
+
+  overall_percent:
+    name: "Gate Position"
+
+  last_state:
+    name: "Last State"
+
+  last_ack:
+    name: "Last Ack"
+
+  last_rs:
+    name: "Last RS"
+
+  moving:
+    name: "Moving"
+
+  fully_open:
+    name: "Fully Open"
+
+  fully_closed:
+    name: "Fully Closed"
+
+  photocell_active:
+    name: "Photocell"
+
+  obstruction_active:
+    name: "Obstruction"
