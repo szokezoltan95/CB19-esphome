@@ -125,6 +125,7 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
 
   uint32_t last_poll_time_{0};
   uint32_t last_motion_change_time_{0};
+  uint32_t suppress_poll_until_{0};
 
   CB19GateCover *cover_{nullptr};
   CB19PedestrianButton *pedestrian_button_{nullptr};

@@ -11,7 +11,6 @@ namespace esphome {
 namespace cb19_gate {
 
 static const char *const TAG = "cb19_gate";
-static const char *const COMMAND_SRC = "P0031DA2";
 
 static std::string trim_copy(std::string s) {
   while (!s.empty() &&
@@ -28,14 +27,15 @@ static std::string trim_copy(std::string s) {
 
 void CB19GateComponent::setup() {
   ESP_LOGI(TAG, "CB19 gate component initialized");
-  this->last_poll_time_ = millis();
-  this->last_motion_change_time_ = millis();
+  const uint32_t now = millis();
+  this->last_poll_time_ = now;
+  this->last_motion_change_time_ = now;
+  this->suppress_poll_until_ = now + 1000;
 }
 
 void CB19GateComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CB19 Gate:");
   ESP_LOGCONFIG(TAG, "  Position range: min=%u max=%u", this->min_position_, this->max_position_);
-  ESP_LOGCONFIG(TAG, "  Command source: %s", COMMAND_SRC);
 }
 
 void CB19GateComponent::loop() {
@@ -62,34 +62,30 @@ void CB19GateComponent::loop() {
 }
 
 void CB19GateComponent::open_gate() {
-  this->set_motion_state_(GateMotionState::OPENING);
   this->send_command_("FULL OPEN");
-  this->publish_all_();
 }
 
 void CB19GateComponent::close_gate() {
-  this->set_motion_state_(GateMotionState::CLOSING);
   this->send_command_("FULL CLOSE");
-  this->publish_all_();
 }
 
 void CB19GateComponent::stop_gate() {
-  this->set_motion_state_(GateMotionState::STOPPED);
   this->send_command_("STOP");
-  this->publish_all_();
 }
 
 void CB19GateComponent::pedestrian_open() {
-  this->set_motion_state_(GateMotionState::PED_OPENING);
   this->send_command_("PED OPEN");
-  this->publish_all_();
 }
 
 void CB19GateComponent::send_command_(const std::string &cmd) {
-  const std::string full = cmd + ";src=" + COMMAND_SRC + "\r\n";
+  const std::string full = cmd + ";src=P0031DA2\r\n";
   ESP_LOGI(TAG, "TX RAW: [%s]", full.c_str());
   this->write_str(full.c_str());
   this->flush();
+
+  const uint32_t now = millis();
+  this->suppress_poll_until_ = now + 500;
+  this->last_poll_time_ = now;
 }
 
 void CB19GateComponent::parse_line_(const std::string &line) {
@@ -378,6 +374,11 @@ uint32_t CB19GateComponent::get_poll_interval_ms_() const {
 
 void CB19GateComponent::maybe_poll_rs_() {
   const uint32_t now = millis();
+
+  if (now < this->suppress_poll_until_) {
+    return;
+  }
+
   const uint32_t interval = this->get_poll_interval_ms_();
 
   if (now - this->last_poll_time_ >= interval) {
