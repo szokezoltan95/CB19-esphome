@@ -2,7 +2,6 @@
 
 #include <array>
 #include <string>
-#include <vector>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/button/button.h"
@@ -94,9 +93,14 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   bool parse_rs_frame_(const std::string &payload, std::array<uint8_t, 9> &out);
   void apply_rs_frame_(const std::array<uint8_t, 9> &frame, const std::string &raw_line);
   void apply_state_line_(const std::string &line);
+  std::string extract_protocol_state_(const std::string &line);
   void publish_all_();
   float scale_position_(uint8_t raw) const;
   std::string motion_state_to_string_(GateMotionState state) const;
+  bool is_moving_state_(GateMotionState state) const;
+  void set_motion_state_(GateMotionState state);
+  void maybe_poll_rs_();
+  uint32_t get_poll_interval_ms_() const;
 
   std::string buffer_;
   bool has_frame_{false};
@@ -118,6 +122,9 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   std::string last_state_line_;
   std::string last_ack_line_;
   std::string last_rs_line_;
+
+  uint32_t last_poll_time_{0};
+  uint32_t last_motion_change_time_{0};
 
   CB19GateCover *cover_{nullptr};
   CB19PedestrianButton *pedestrian_button_{nullptr};

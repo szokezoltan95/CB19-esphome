@@ -11,6 +11,7 @@ namespace esphome {
 namespace cb19_gate {
 
 static const char *const TAG = "cb19_gate";
+static const char *const COMMAND_SRC = "P0031DA2";
 
 static std::string trim_copy(std::string s) {
   while (!s.empty() &&
@@ -27,11 +28,14 @@ static std::string trim_copy(std::string s) {
 
 void CB19GateComponent::setup() {
   ESP_LOGI(TAG, "CB19 gate component initialized");
+  this->last_poll_time_ = millis();
+  this->last_motion_change_time_ = millis();
 }
 
 void CB19GateComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CB19 Gate:");
   ESP_LOGCONFIG(TAG, "  Position range: min=%u max=%u", this->min_position_, this->max_position_);
+  ESP_LOGCONFIG(TAG, "  Command source: %s", COMMAND_SRC);
 }
 
 void CB19GateComponent::loop() {
@@ -53,21 +57,37 @@ void CB19GateComponent::loop() {
       }
     }
   }
+
+  this->maybe_poll_rs_();
 }
 
-void CB19GateComponent::open_gate() { this->send_command_("FULL OPEN"); }
+void CB19GateComponent::open_gate() {
+  this->set_motion_state_(GateMotionState::OPENING);
+  this->send_command_("FULL OPEN");
+  this->publish_all_();
+}
 
-void CB19GateComponent::close_gate() { this->send_command_("FULL CLOSE"); }
+void CB19GateComponent::close_gate() {
+  this->set_motion_state_(GateMotionState::CLOSING);
+  this->send_command_("FULL CLOSE");
+  this->publish_all_();
+}
 
-void CB19GateComponent::stop_gate() { this->send_command_("STOP"); }
+void CB19GateComponent::stop_gate() {
+  this->set_motion_state_(GateMotionState::STOPPED);
+  this->send_command_("STOP");
+  this->publish_all_();
+}
 
-void CB19GateComponent::pedestrian_open() { this->send_command_("PED OPEN"); }
+void CB19GateComponent::pedestrian_open() {
+  this->set_motion_state_(GateMotionState::PED_OPENING);
+  this->send_command_("PED OPEN");
+  this->publish_all_();
+}
 
 void CB19GateComponent::send_command_(const std::string &cmd) {
-  std::string full = cmd + ";src=P0031DA2\r\n";
-
+  const std::string full = cmd + ";src=" + COMMAND_SRC + "\r\n";
   ESP_LOGI(TAG, "TX RAW: [%s]", full.c_str());
-
   this->write_str(full.c_str());
   this->flush();
 }
@@ -85,7 +105,7 @@ void CB19GateComponent::parse_line_(const std::string &line) {
     return;
   }
 
-  if (line.rfind("ACK ", 0) == 0) {
+  if (line.rfind("ACK ", 0) == 0 || line.rfind("NAK ", 0) == 0) {
     this->last_ack_line_ = line;
     if (this->last_ack_text_sensor_ != nullptr) {
       this->last_ack_text_sensor_->publish_state(line);
@@ -109,6 +129,7 @@ bool CB19GateComponent::parse_rs_frame_(const std::string &payload, std::array<u
     if (index >= out.size()) {
       return false;
     }
+
     unsigned int value = 0;
     if (std::sscanf(token.c_str(), "%x", &value) != 1 || value > 0xFF) {
       return false;
@@ -125,46 +146,54 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
   this->last_rs_line_ = raw_line;
 
   this->photocell_active_ = (frame[0] == 0x62);
+
   this->motor1_raw_ = frame[3];
   this->motor2_raw_ = frame[6];
+
   this->motor1_percent_ = this->scale_position_(this->motor1_raw_);
   this->motor2_percent_ = this->scale_position_(this->motor2_raw_);
-  this->overall_percent_ = (this->motor1_percent_ + this->motor2_percent_) / 2.0f;
+
+  if (this->motion_state_ == GateMotionState::PED_OPENING || this->motion_state_ == GateMotionState::PED_OPENED) {
+    this->overall_percent_ = this->motor1_percent_;
+  } else {
+    this->overall_percent_ = (this->motor1_percent_ + this->motor2_percent_) / 2.0f;
+  }
 
   switch (frame[2]) {
     case 0xCC:
-      if (this->motion_state_ != GateMotionState::PED_OPENING) {
-        if (this->last_state_line_ == "Closing") {
-          this->motion_state_ = GateMotionState::CLOSING;
-        } else {
-          this->motion_state_ = GateMotionState::OPENING;
-        }
-      }
       this->obstruction_active_ = false;
+      if (this->last_state_line_ == "Closing") {
+        this->set_motion_state_(GateMotionState::CLOSING);
+      } else if (this->last_state_line_ == "PedOpening") {
+        this->set_motion_state_(GateMotionState::PED_OPENING);
+      } else {
+        this->set_motion_state_(GateMotionState::OPENING);
+      }
       break;
 
     case 0xAA:
       this->obstruction_active_ = false;
       if (this->overall_percent_ > 90.0f) {
-        this->motion_state_ = GateMotionState::OPENED;
+        this->set_motion_state_(GateMotionState::OPENED);
       } else if (this->overall_percent_ < 10.0f) {
-        this->motion_state_ = GateMotionState::CLOSED;
+        this->set_motion_state_(GateMotionState::CLOSED);
       }
       break;
 
     case 0xEE:
-      this->motion_state_ = GateMotionState::STOPPED;
       this->obstruction_active_ = true;
+      this->set_motion_state_(GateMotionState::STOPPED);
       break;
 
     case 0xDB:
     case 0xFB:
-      if (this->last_state_line_ == "PedOpened") {
-        this->motion_state_ = GateMotionState::PED_OPENED;
-      } else {
-        this->motion_state_ = GateMotionState::PED_OPENING;
-      }
       this->obstruction_active_ = false;
+      if (this->last_state_line_ == "PedOpened") {
+        this->set_motion_state_(GateMotionState::PED_OPENED);
+      } else {
+        this->set_motion_state_(GateMotionState::PED_OPENING);
+      }
+      this->overall_percent_ = this->motor1_percent_;
       break;
 
     default:
@@ -178,33 +207,63 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
   this->publish_all_();
 }
 
-void CB19GateComponent::apply_state_line_(const std::string &line) {
-  this->last_state_line_ = line;
+std::string CB19GateComponent::extract_protocol_state_(const std::string &line) {
+  if (line.rfind("$V1PKF", 0) != 0) {
+    return trim_copy(line);
+  }
 
-  if (line == "Opening") {
-    this->motion_state_ = GateMotionState::OPENING;
+  const size_t first_comma = line.find(',');
+  if (first_comma == std::string::npos) {
+    return trim_copy(line);
+  }
+
+  const size_t second_comma = line.find(',', first_comma + 1);
+  if (second_comma == std::string::npos) {
+    return trim_copy(line);
+  }
+
+  std::string payload = line.substr(second_comma + 1);
+  const size_t src_pos = payload.find(";src=");
+  if (src_pos != std::string::npos) {
+    payload = payload.substr(0, src_pos);
+  }
+
+  return trim_copy(payload);
+}
+
+void CB19GateComponent::apply_state_line_(const std::string &line) {
+  const std::string state = this->extract_protocol_state_(line);
+  this->last_state_line_ = state;
+
+  if (state == "Opening") {
     this->obstruction_active_ = false;
-  } else if (line == "Opened") {
-    this->motion_state_ = GateMotionState::OPENED;
+    this->set_motion_state_(GateMotionState::OPENING);
+  } else if (state == "Opened") {
     this->obstruction_active_ = false;
-  } else if (line == "Closing") {
-    this->motion_state_ = GateMotionState::CLOSING;
+    this->overall_percent_ = 100.0f;
+    this->set_motion_state_(GateMotionState::OPENED);
+  } else if (state == "Closing") {
     this->obstruction_active_ = false;
-  } else if (line == "Closed") {
-    this->motion_state_ = GateMotionState::CLOSED;
+    this->set_motion_state_(GateMotionState::CLOSING);
+  } else if (state == "Closed") {
     this->obstruction_active_ = false;
-  } else if (line == "Stopped") {
-    this->motion_state_ = GateMotionState::STOPPED;
-  } else if (line == "PedOpening") {
-    this->motion_state_ = GateMotionState::PED_OPENING;
+    this->overall_percent_ = 0.0f;
+    this->set_motion_state_(GateMotionState::CLOSED);
+  } else if (state == "Stopped") {
+    this->set_motion_state_(GateMotionState::STOPPED);
+  } else if (state == "PedOpening") {
     this->obstruction_active_ = false;
-  } else if (line == "PedOpened") {
-    this->motion_state_ = GateMotionState::PED_OPENED;
+    this->set_motion_state_(GateMotionState::PED_OPENING);
+  } else if (state == "PedOpened") {
     this->obstruction_active_ = false;
+    this->overall_percent_ = this->motor1_percent_;
+    this->set_motion_state_(GateMotionState::PED_OPENED);
+  } else {
+    ESP_LOGD(TAG, "Unhandled state line payload: %s", state.c_str());
   }
 
   if (this->last_state_text_sensor_ != nullptr) {
-    this->last_state_text_sensor_->publish_state(line);
+    this->last_state_text_sensor_->publish_state(state);
   }
 
   this->publish_all_();
@@ -227,11 +286,8 @@ void CB19GateComponent::publish_all_() {
     this->overall_percent_sensor_->publish_state(this->overall_percent_);
   }
 
-  const bool moving = this->motion_state_ == GateMotionState::OPENING ||
-                      this->motion_state_ == GateMotionState::CLOSING ||
-                      this->motion_state_ == GateMotionState::PED_OPENING;
-  const bool fully_open = this->motion_state_ == GateMotionState::OPENED ||
-                          this->motion_state_ == GateMotionState::PED_OPENED;
+  const bool moving = this->is_moving_state_(this->motion_state_);
+  const bool fully_open = this->motion_state_ == GateMotionState::OPENED;
   const bool fully_closed = this->motion_state_ == GateMotionState::CLOSED;
 
   if (this->moving_binary_sensor_ != nullptr) {
@@ -260,9 +316,9 @@ float CB19GateComponent::scale_position_(uint8_t raw) const {
     return 0.0f;
   }
 
-  float value = 100.0f * float(raw - this->min_position_) / float(this->max_position_ - this->min_position_);
-  value = std::max(0.0f, std::min(100.0f, value));
-  return value;
+  const float value = 100.0f * float(raw - this->min_position_) /
+                      float(this->max_position_ - this->min_position_);
+  return std::max(0.0f, std::min(100.0f, value));
 }
 
 std::string CB19GateComponent::motion_state_to_string_(GateMotionState state) const {
@@ -287,6 +343,49 @@ std::string CB19GateComponent::motion_state_to_string_(GateMotionState state) co
   }
 }
 
+bool CB19GateComponent::is_moving_state_(GateMotionState state) const {
+  return state == GateMotionState::OPENING ||
+         state == GateMotionState::CLOSING ||
+         state == GateMotionState::PED_OPENING;
+}
+
+void CB19GateComponent::set_motion_state_(GateMotionState state) {
+  if (this->motion_state_ != state) {
+    this->motion_state_ = state;
+    this->last_motion_change_time_ = millis();
+    ESP_LOGD(TAG, "Motion state -> %s", this->motion_state_to_string_(state).c_str());
+  }
+}
+
+uint32_t CB19GateComponent::get_poll_interval_ms_() const {
+  if (this->is_moving_state_(this->motion_state_)) {
+    return 200;
+  }
+
+  if (this->motion_state_ == GateMotionState::UNKNOWN) {
+    return 1000;
+  }
+
+  const uint32_t now = millis();
+  const uint32_t since_change = now - this->last_motion_change_time_;
+
+  if (since_change < 10000) {
+    return 500;
+  }
+
+  return 60000;
+}
+
+void CB19GateComponent::maybe_poll_rs_() {
+  const uint32_t now = millis();
+  const uint32_t interval = this->get_poll_interval_ms_();
+
+  if (now - this->last_poll_time_ >= interval) {
+    this->last_poll_time_ = now;
+    this->send_command_("RS");
+  }
+}
+
 cover::CoverTraits CB19GateCover::get_traits() {
   auto traits = cover::CoverTraits();
   traits.set_is_assumed_state(false);
@@ -302,10 +401,22 @@ void CB19GateCover::control(const cover::CoverCall &call) {
 
   if (call.get_stop()) {
     this->parent_->stop_gate();
+    return;
   }
 
   if (call.get_position().has_value()) {
     const float pos = *call.get_position();
+
+    if (pos >= 0.99f) {
+      this->parent_->open_gate();
+      return;
+    }
+
+    if (pos <= 0.01f) {
+      this->parent_->close_gate();
+      return;
+    }
+
     if (pos > this->position) {
       this->parent_->open_gate();
     } else if (pos < this->position) {
