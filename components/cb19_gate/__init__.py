@@ -8,7 +8,6 @@ from esphome.const import (
     DEVICE_CLASS_GATE,
     ENTITY_CATEGORY_DIAGNOSTIC,
     ICON_COUNTER,
-    ICON_GATE,
     ICON_PERCENT,
 )
 
@@ -47,7 +46,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_COVER): cover.COVER_SCHEMA.extend(
             {
                 cv.GenerateID(): cv.declare_id(CB19GateCover),
-                cv.Optional("device_class", default=DEVICE_CLASS_GATE): cv.string,
                 cv.Optional(CONF_NAME, default="CB19 Gate"): cv.string,
             }
         ),
@@ -80,7 +78,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_OVERALL_PERCENT): sensor.sensor_schema(
             accuracy_decimals=1,
             unit_of_measurement="%",
-            icon=ICON_GATE,
+            icon=ICON_PERCENT,
         ),
         cv.Optional(CONF_LAST_STATE): text_sensor.text_sensor_schema(
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC
@@ -125,15 +123,19 @@ async def to_code(config):
     if CONF_MOTOR1_RAW in config:
         sens = await sensor.new_sensor(config[CONF_MOTOR1_RAW])
         cg.add(var.set_motor1_raw_sensor(sens))
+
     if CONF_MOTOR2_RAW in config:
         sens = await sensor.new_sensor(config[CONF_MOTOR2_RAW])
         cg.add(var.set_motor2_raw_sensor(sens))
+
     if CONF_MOTOR1_PERCENT in config:
         sens = await sensor.new_sensor(config[CONF_MOTOR1_PERCENT])
         cg.add(var.set_motor1_percent_sensor(sens))
+
     if CONF_MOTOR2_PERCENT in config:
         sens = await sensor.new_sensor(config[CONF_MOTOR2_PERCENT])
         cg.add(var.set_motor2_percent_sensor(sens))
+
     if CONF_OVERALL_PERCENT in config:
         sens = await sensor.new_sensor(config[CONF_OVERALL_PERCENT])
         cg.add(var.set_overall_percent_sensor(sens))
@@ -141,9 +143,11 @@ async def to_code(config):
     if CONF_LAST_STATE in config:
         ts = await text_sensor.new_text_sensor(config[CONF_LAST_STATE])
         cg.add(var.set_last_state_text_sensor(ts))
+
     if CONF_LAST_ACK in config:
         ts = await text_sensor.new_text_sensor(config[CONF_LAST_ACK])
         cg.add(var.set_last_ack_text_sensor(ts))
+
     if CONF_LAST_RS in config:
         ts = await text_sensor.new_text_sensor(config[CONF_LAST_RS])
         cg.add(var.set_last_rs_text_sensor(ts))
@@ -151,15 +155,19 @@ async def to_code(config):
     if CONF_MOVING in config:
         bs = await binary_sensor.new_binary_sensor(config[CONF_MOVING])
         cg.add(var.set_moving_binary_sensor(bs))
+
     if CONF_FULLY_OPEN in config:
         bs = await binary_sensor.new_binary_sensor(config[CONF_FULLY_OPEN])
         cg.add(var.set_fully_open_binary_sensor(bs))
+
     if CONF_FULLY_CLOSED in config:
         bs = await binary_sensor.new_binary_sensor(config[CONF_FULLY_CLOSED])
         cg.add(var.set_fully_closed_binary_sensor(bs))
+
     if CONF_PHOTOCELL_ACTIVE in config:
         bs = await binary_sensor.new_binary_sensor(config[CONF_PHOTOCELL_ACTIVE])
         cg.add(var.set_photocell_binary_sensor(bs))
+
     if CONF_OBSTRUCTION_ACTIVE in config:
         bs = await binary_sensor.new_binary_sensor(config[CONF_OBSTRUCTION_ACTIVE])
         cg.add(var.set_obstruction_binary_sensor(bs))
