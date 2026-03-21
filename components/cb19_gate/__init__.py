@@ -5,7 +5,6 @@ from esphome.const import (
     CONF_ID,
     CONF_NAME,
     CONF_UART_ID,
-    DEVICE_CLASS_GATE,
     ENTITY_CATEGORY_DIAGNOSTIC,
     ICON_COUNTER,
     ICON_PERCENT,
@@ -43,18 +42,19 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_MIN_POSITION, default=1): cv.int_range(min=0, max=255),
         cv.Optional(CONF_MAX_POSITION, default=225): cv.int_range(min=1, max=255),
-        cv.Optional(CONF_COVER): cover.COVER_SCHEMA.extend(
+
+        cv.Optional(CONF_COVER): cover.cover_schema(CB19GateCover).extend(
             {
-                cv.GenerateID(): cv.declare_id(CB19GateCover),
                 cv.Optional(CONF_NAME, default="CB19 Gate"): cv.string,
             }
         ),
-        cv.Optional(CONF_PEDESTRIAN_BUTTON): button.BUTTON_SCHEMA.extend(
+
+        cv.Optional(CONF_PEDESTRIAN_BUTTON): button.button_schema(CB19PedestrianButton).extend(
             {
-                cv.GenerateID(): cv.declare_id(CB19PedestrianButton),
                 cv.Optional(CONF_NAME, default="Pedestrian Open"): cv.string,
             }
         ),
+
         cv.Optional(CONF_MOTOR1_RAW): sensor.sensor_schema(
             accuracy_decimals=0,
             icon=ICON_COUNTER,
