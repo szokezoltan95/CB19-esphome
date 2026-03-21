@@ -231,15 +231,27 @@ button:
 - cover position sync
 - stability improvements
 
-### 🔮 Future plans
-- auto-calibration of position range
-- watchdog & reconnect logic
-- error recovery
-- advanced obstruction classification
-- logging & diagnostics
-- multi-device support
-- configurable motor mapping
-- optional smoothing of position signal
+## 🔮 Future plans
+
+This project is not limited to basic gate control. The long-term goal is to reproduce as much of the original TMT app functionality as possible through ESPHome and Home Assistant.
+
+Planned areas of development:
+
+- full decoding of configuration-related protocol messages
+- reading all controller configuration values (`F` codes)
+- exposing controller settings as Home Assistant entities
+- changing gate controller settings directly from Home Assistant
+- implementing the full TMT app configuration workflow
+- support for timing, delay, and behavior parameters
+- support for obstruction, photocell, and safety-related settings
+- remote management of paired hardware remotes
+- reading and editing remote-control related data if supported by the protocol
+- improved protocol coverage beyond basic command/status handling
+- better distinction between user stop, safety stop, and obstruction events
+- optional advanced diagnostics for installation and servicing
+- documenting all known protocol messages and field meanings
+
+The ultimate target is not just a UART bridge, but a full-featured CB19 integration layer that allows both everyday control and deep controller configuration.
 
 ---
 
