@@ -13,7 +13,9 @@ namespace cb19_gate {
 static const char *const TAG = "cb19_gate";
 
 static std::string trim_copy(std::string s) {
-  while (!s.empty() && (s.back() == '\r' || s.back() == '\n' || std::isspace(static_cast<unsigned char>(s.back())))) {
+  while (!s.empty() &&
+         (s.back() == '\r' || s.back() == '\n' ||
+          std::isspace(static_cast<unsigned char>(s.back())))) {
     s.pop_back();
   }
   size_t start = 0;
@@ -30,7 +32,6 @@ void CB19GateComponent::setup() {
 void CB19GateComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CB19 Gate:");
   ESP_LOGCONFIG(TAG, "  Position range: min=%u max=%u", this->min_position_, this->max_position_);
-  LOG_UART_DEVICE(this);
 }
 
 void CB19GateComponent::loop() {
@@ -139,6 +140,7 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
       }
       this->obstruction_active_ = false;
       break;
+
     case 0xAA:
       this->obstruction_active_ = false;
       if (this->overall_percent_ > 90.0f) {
@@ -147,10 +149,12 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
         this->motion_state_ = GateMotionState::CLOSED;
       }
       break;
+
     case 0xEE:
       this->motion_state_ = GateMotionState::STOPPED;
       this->obstruction_active_ = true;
       break;
+
     case 0xDB:
     case 0xFB:
       if (this->last_state_line_ == "PedOpened") {
@@ -160,6 +164,7 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
       }
       this->obstruction_active_ = false;
       break;
+
     default:
       break;
   }
@@ -252,6 +257,7 @@ float CB19GateComponent::scale_position_(uint8_t raw) const {
   if (this->max_position_ <= this->min_position_) {
     return 0.0f;
   }
+
   float value = 100.0f * float(raw - this->min_position_) / float(this->max_position_ - this->min_position_);
   value = std::max(0.0f, std::min(100.0f, value));
   return value;
@@ -284,7 +290,6 @@ cover::CoverTraits CB19GateCover::get_traits() {
   traits.set_is_assumed_state(false);
   traits.set_supports_position(true);
   traits.set_supports_stop(true);
-  traits.set_device_class(cover::COVER_DEVICE_CLASS_GATE);
   return traits;
 }
 
