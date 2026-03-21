@@ -48,6 +48,20 @@ cb19_gate:
 
   pedestrian_button:
     name: "Pedestrian Open"
+    
+  opening_start_percent:
+    name: "Opening Start Percent"
+    initial_value: 56
+    min_value: 0
+    max_value: 99
+    step: 1
+
+  closing_start_percent:
+    name: "Closing Start Percent"
+    initial_value: 44
+    min_value: 1
+    max_value: 100
+    step: 1
 
   motor1_raw:
     name: "Motor1 Raw"
