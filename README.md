@@ -2,176 +2,205 @@
 
 Custom ESPHome component for controlling CB19 gate controllers over UART (RS protocol).
 
-This project replaces the original WiFi module and provides full integration with Home Assistant.
+This project replaces the original WiFi module and enables full local control and monitoring of the gate through Home Assistant.
 
 ---
 
-## 🚀 Features
+## Overview
 
-| Feature | Description |
-|--------|------------|
-| Gate control | Open / Close / Stop / Pedestrian |
-| Position tracking | Real-time feedback from RS frames |
-| Status detection | Opening, Closing, Stopped, Obstruction |
-| Safety | Photocell + obstruction detection |
-| Calibration | Adjustable from Home Assistant |
-| Integration | Native ESPHome + HA support |
+The CB19 gate controller communicates over a UART-based ASCII protocol.  
+This project implements that protocol inside ESPHome, allowing you to:
 
----
-
-## ⚠️ Disclaimer
-
-This is a reverse-engineered protocol. Use at your own risk.
+- fully control the gate (open, close, stop, pedestrian mode)
+- read real-time position and movement state
+- detect obstruction and photocell events
+- integrate everything seamlessly into Home Assistant
 
 ---
 
-## 🔧 Hardware Requirements
+## Features
 
-| Component | Notes |
-|----------|------|
-| ESP32 | Tested on esp32_devkitc_v4 |
-| UART | Direct connection to gate controller |
-| Voltage divider | REQUIRED |
+- Open / Close / Stop / Pedestrian control
+- Real-time position tracking (based on RS frames)
+- Motion state detection (opening, closing, idle)
+- Obstruction and photocell monitoring
+- Adaptive polling to avoid overloading the controller
+- Live calibration from Home Assistant
+- Fully local operation (no cloud)
 
 ---
 
-## 🔌 Wiring
+## Hardware Requirements
 
-⚠️ The gate controller uses higher voltage levels than ESP32.
+To build the system you will need:
 
-### Voltage Divider (REQUIRED)
+- ESP32 (tested on `esp32_devkitc_v4`)
+- UART connection to the CB19 controller
+- Voltage level adaptation (mandatory)
 
-| Element | Value |
-|--------|------|
-| R1 | 10kΩ |
-| R2 | 18kΩ |
+---
 
-### Connection
+## Wiring
 
+The CB19 controller uses higher voltage logic levels than the ESP32.
+
+Connecting it directly **will damage the ESP32**.
+
+### Voltage divider (required)
+
+Connection:
 ```
-Gate TX ---[ R1 10k ]---+--- ESP RX
-                        |
-                     [ R2 18k ]
-                        |
-                       GND
+    Gate TX ---[10k]---+--- ESP RX
+                       |
+                     [18k]
+                       |
+                      GND
 ```
+Notes:
 
-### Notes
-
-- NEVER connect Gate TX directly to ESP RX
-- ESP TX → Gate RX is usually safe directly
+- Never connect Gate TX directly to ESP RX
+- ESP TX → Gate RX is typically safe directly
+- Keep wires short and clean to avoid noise
 
 ---
 
-## 🧩 Custom PCB (Fusion 360)
+## Custom PCB (Fusion 360)
 
-File location:
+A ready-to-use PCB design is included in the repository:
 
-```
-docs/cb19-gate-espboard.fbrd
-```
+    docs/cb19-gate-espboard.fbrd
+
+This design already includes:
+
+- correct resistor divider
+- proper routing
+- ESP integration
 
 Important:
-- R1 = 10kΩ
-- R2 = 18kΩ
+
+- R1 must be 10kΩ
+- R2 must be 18kΩ
 
 ---
 
-## ⚙️ ESPHome Configuration
+## ESPHome Configuration
 
-Fully working example:
+A fully working example configuration is available:
 
-```
-examples/cb19_example.yaml
-```
+    examples/cb19_example.yaml
 
-👉 Only WiFi credentials need to be added.
+To use it:
 
----
+1. Copy the file
+2. Add your WiFi credentials
+3. Check and modify RX and TX pins for your board
+4. Upload to ESP
 
-## 📡 Communication Protocol
-
-### Command format
-
-```
-COMMAND;src=P0031DA2\r\n
-```
-
-### Commands
-
-| Command | Description |
-|--------|------------|
-| FULL OPEN | Open gate |
-| FULL CLOSE | Close gate |
-| STOP | Stop movement |
-| PED OPEN | Pedestrian mode |
-| RS | Status request |
+No additional changes are required.
 
 ---
 
-## 📥 Responses
+## How It Works
 
-| Response | Meaning |
-|---------|--------|
-| ACK | Command accepted |
-| NAK | Command rejected |
-| ACK RS | Status frame |
+The ESP communicates with the gate controller using ASCII commands over UART.
 
----
+Commands are sent in the following format:
 
-## 📊 RS Frame Structure
+    COMMAND;src=P0031DA2\r\n
 
-Example:
+Examples:
 
-```
-ACK RS:60,64,CC,0D,3E,07,01,40,00
-```
+- FULL OPEN → opens the gate
+- FULL CLOSE → closes the gate
+- STOP → stops movement
+- PED OPEN → pedestrian mode
+- RS → request status
 
-### Key bytes
+The controller responds with:
 
-| Byte | Meaning |
-|------|--------|
-| 0 | Photocell |
-| 2 | Motion state |
-| 3 | Motor 1 position |
-| 6 | Motor 2 position |
-
-### Motion states
-
-| Value | Meaning |
-|------|--------|
-| CC | Moving |
-| AA | Idle |
-| EE | Obstruction |
+- ACK → command accepted
+- NAK → command rejected
+- ACK RS → status frame
 
 ---
 
-## 🎯 Calibration
+## Position Handling
+
+The controller does not provide normalized position values.
 
 Observed behavior:
 
-| Direction | Start offset |
-|----------|-------------|
-| Opening | ~56% |
-| Closing | ~44% |
+- Opening starts around ~56%
+- Closing starts around ~44%
 
-### HA Entities
+To correct this, the component provides two calibration values:
 
 - Opening Start Percent
 - Closing Start Percent
 
----
+These can be adjusted directly from Home Assistant.
 
-## 🔄 Polling Strategy
+This allows:
 
-| State | Interval |
-|------|---------|
-| Moving | 200 ms |
-| After stop | 500 ms (10s) |
-| Idle | 60 s |
+- correct 0–100% representation
+- accurate cover behavior
+- no need for reflashing
 
 ---
 
-## 📜 License
+## Polling Strategy
+
+To keep communication safe and stable:
+
+- During movement → polling every 200 ms
+- After movement → polling every 500 ms for 10 seconds
+- Idle → polling every 60 seconds
+
+Additionally:
+
+- polling pauses briefly after sending a command
+
+This ensures:
+
+- responsive updates
+- no overload of the controller
+
+---
+
+## Project Structure
+
+- components/ → ESPHome custom component
+- example/ → working YAML + PCB design
+- docs/ → protocol documentation
+
+---
+
+## Documentation
+
+Detailed protocol description is available here:
+
+    docs/protocol.md
+
+---
+
+## Current Status
+
+- Communication stable
+- Commands reliable
+- Position tracking usable
+- Fully integrated with Home Assistant
+
+---
+
+## Future Plans
+
+- Read and modify full configuration (F-codes)
+- Remote management (pairing remotes)
+- Full replacement of official mobile app
+- Advanced diagnostics
+
+---
+
+## License
 
 MIT License
