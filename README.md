@@ -8,79 +8,167 @@ This project replaces the original WiFi module and provides full integration wit
 
 ## 🚀 Features
 
-- Full gate control (open / close / stop / pedestrian mode)
-- Real-time position tracking
-- RS protocol decoding
-- Obstruction and photocell detection
-- Adaptive polling (safe for controller)
-- Live calibration of gate position report from Home Assistant
-- ESPHome native integration
+| Feature | Description |
+|--------|------------|
+| Gate control | Open / Close / Stop / Pedestrian |
+| Position tracking | Real-time feedback from RS frames |
+| Status detection | Opening, Closing, Stopped, Obstruction |
+| Safety | Photocell + obstruction detection |
+| Calibration | Adjustable from Home Assistant |
+| Integration | Native ESPHome + HA support |
 
 ---
 
 ## ⚠️ Disclaimer
 
-This is a reverse-engineered protocol implementation.  
-Use at your own risk.
+This is a reverse-engineered protocol. Use at your own risk.
 
 ---
 
 ## 🔧 Hardware Requirements
 
-- ESP32 (tested on esp32_devkitc_v4)
-- UART connection to CB19 controller
-- Voltage level adaptation (REQUIRED)
+| Component | Notes |
+|----------|------|
+| ESP32 | Tested on esp32_devkitc_v4 |
+| UART | Direct connection to gate controller |
+| Voltage divider | REQUIRED |
 
 ---
 
-## 🔌 Wiring (VERY IMPORTANT)
+## 🔌 Wiring
 
-Voltage divider REQUIRED:
+⚠️ The gate controller uses higher voltage levels than ESP32.
 
-Gate TX -- R1 --+-- ESP RX
-                |
-               R2
-                |
-               GND
+### Voltage Divider (REQUIRED)
 
-R1 = 10kΩ  
-R2 = 18kΩ  
+| Element | Value |
+|--------|------|
+| R1 | 10kΩ |
+| R2 | 18kΩ |
 
-ESP TX may be directly wired to GATE RX
+### Connection
+
+```
+Gate TX ---[ R1 10k ]---+--- ESP RX
+                        |
+                     [ R2 18k ]
+                        |
+                       GND
+```
+
+### Notes
+
+- NEVER connect Gate TX directly to ESP RX
+- ESP TX → Gate RX is usually safe directly
 
 ---
 
-## 🧩 Custom ESP PCB (Autodesk Fusion)
+## 🧩 Custom PCB (Fusion 360)
 
+File location:
+
+```
 docs/cb19-gate-espboard.fbrd
+```
 
-Suitable for esp32_devkitc_v4
+Important:
+- R1 = 10kΩ
+- R2 = 18kΩ
 
 ---
 
 ## ⚙️ ESPHome Configuration
 
-See fully working example:
+Fully working example:
 
-example/cb19_example.yaml
+```
+examples/cb19_example.yaml
+```
 
-Only WiFi credentials need to be added.
+👉 Only WiFi credentials need to be added.
 
 ---
 
 ## 📡 Communication Protocol
 
-Command format:
+### Command format
 
+```
 COMMAND;src=P0031DA2\r\n
+```
 
-Examples:
+### Commands
 
-FULL OPEN;src=P0031DA2  
-FULL CLOSE;src=P0031DA2  
-STOP;src=P0031DA2  
-PED OPEN;src=P0031DA2  
-RS;src=P0031DA2  
+| Command | Description |
+|--------|------------|
+| FULL OPEN | Open gate |
+| FULL CLOSE | Close gate |
+| STOP | Stop movement |
+| PED OPEN | Pedestrian mode |
+| RS | Status request |
+
+---
+
+## 📥 Responses
+
+| Response | Meaning |
+|---------|--------|
+| ACK | Command accepted |
+| NAK | Command rejected |
+| ACK RS | Status frame |
+
+---
+
+## 📊 RS Frame Structure
+
+Example:
+
+```
+ACK RS:60,64,CC,0D,3E,07,01,40,00
+```
+
+### Key bytes
+
+| Byte | Meaning |
+|------|--------|
+| 0 | Photocell |
+| 2 | Motion state |
+| 3 | Motor 1 position |
+| 6 | Motor 2 position |
+
+### Motion states
+
+| Value | Meaning |
+|------|--------|
+| CC | Moving |
+| AA | Idle |
+| EE | Obstruction |
+
+---
+
+## 🎯 Calibration
+
+Observed behavior:
+
+| Direction | Start offset |
+|----------|-------------|
+| Opening | ~56% |
+| Closing | ~44% |
+
+### HA Entities
+
+- Opening Start Percent
+- Closing Start Percent
+
+---
+
+## 🔄 Polling Strategy
+
+| State | Interval |
+|------|---------|
+| Moving | 200 ms |
+| After stop | 500 ms (10s) |
+| Idle | 60 s |
 
 ---
 
