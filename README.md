@@ -170,8 +170,8 @@ This ensures:
 ## Project Structure
 
 - components/ → ESPHome custom component
-- example/ → working YAML + PCB design
-- docs/ → protocol documentation
+- examples/ → working YAML
+- docs/ → protocol documentation + PCB design file
 
 ---
 
