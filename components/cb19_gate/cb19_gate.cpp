@@ -25,17 +25,55 @@ static std::string trim_copy(std::string s) {
   return s.substr(start);
 }
 
+void CB19OpeningStartNumber::control(float value) {
+  if (this->parent_ != nullptr) {
+    this->parent_->set_opening_start_percent(value);
+  }
+  this->publish_state(value);
+}
+
+void CB19ClosingStartNumber::control(float value) {
+  if (this->parent_ != nullptr) {
+    this->parent_->set_closing_start_percent(value);
+  }
+  this->publish_state(value);
+}
+
+void CB19GateComponent::set_opening_start_percent(float value) {
+  this->opening_start_percent_ = std::max(0.0f, std::min(99.0f, value));
+  this->recalculate_positions_();
+  this->publish_all_();
+}
+
+void CB19GateComponent::set_closing_start_percent(float value) {
+  this->closing_start_percent_ = std::max(1.0f, std::min(100.0f, value));
+  this->recalculate_positions_();
+  this->publish_all_();
+}
+
 void CB19GateComponent::setup() {
   ESP_LOGI(TAG, "CB19 gate component initialized");
   const uint32_t now = millis();
   this->last_poll_time_ = now;
   this->last_motion_change_time_ = now;
   this->suppress_poll_until_ = now + 1000;
+
+  if (this->opening_start_number_ != nullptr) {
+    this->opening_start_percent_ = this->opening_start_number_->get_initial_value();
+    this->opening_start_number_->publish_state(this->opening_start_percent_);
+  }
+
+  if (this->closing_start_number_ != nullptr) {
+    this->closing_start_percent_ = this->closing_start_number_->get_initial_value();
+    this->closing_start_number_->publish_state(this->closing_start_percent_);
+  }
 }
 
 void CB19GateComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "CB19 Gate:");
-  ESP_LOGCONFIG(TAG, "  Position range: min=%u max=%u", this->min_position_, this->max_position_);
+  ESP_LOGCONFIG(TAG, "  Position range fallback: min=%u max=%u", this->min_position_, this->max_position_);
+  ESP_LOGCONFIG(TAG, "  Opening start percent: %.1f", this->opening_start_percent_);
+  ESP_LOGCONFIG(TAG, "  Closing start percent: %.1f", this->closing_start_percent_);
 }
 
 void CB19GateComponent::loop() {
@@ -136,6 +174,67 @@ bool CB19GateComponent::parse_rs_frame_(const std::string &payload, std::array<u
   return index == out.size();
 }
 
+float CB19GateComponent::scale_position_fallback_(uint8_t raw) const {
+  if (this->max_position_ <= this->min_position_) {
+    return 0.0f;
+  }
+
+  const float value = 100.0f * float(raw - this->min_position_) /
+                      float(this->max_position_ - this->min_position_);
+  return std::max(0.0f, std::min(100.0f, value));
+}
+
+float CB19GateComponent::scale_motor_position_(uint8_t raw,
+                                               bool closed_valid, uint8_t closed_ref,
+                                               bool open_valid, uint8_t open_ref) const {
+  if (!(closed_valid && open_valid)) {
+    return this->scale_position_fallback_(raw);
+  }
+
+  if (open_ref <= closed_ref) {
+    return this->scale_position_fallback_(raw);
+  }
+
+  const float value = 100.0f * float(raw - closed_ref) / float(open_ref - closed_ref);
+  return std::max(0.0f, std::min(100.0f, value));
+}
+
+float CB19GateComponent::apply_cover_calibration_(float base_percent) const {
+  float value = base_percent;
+
+  if (this->motion_state_ == GateMotionState::OPENING || this->motion_state_ == GateMotionState::PED_OPENING) {
+    if (this->opening_start_percent_ < 99.0f) {
+      value = (base_percent - this->opening_start_percent_) * 100.0f / (100.0f - this->opening_start_percent_);
+    }
+  } else if (this->motion_state_ == GateMotionState::CLOSING) {
+    if (this->closing_start_percent_ > 0.0f) {
+      value = base_percent * 100.0f / this->closing_start_percent_;
+    }
+  }
+
+  return std::max(0.0f, std::min(100.0f, value));
+}
+
+void CB19GateComponent::recalculate_positions_() {
+  this->motor1_percent_ = this->scale_motor_position_(
+      this->motor1_raw_,
+      this->motor1_closed_ref_valid_, this->motor1_closed_ref_,
+      this->motor1_open_ref_valid_, this->motor1_open_ref_);
+
+  this->motor2_percent_ = this->scale_motor_position_(
+      this->motor2_raw_,
+      this->motor2_closed_ref_valid_, this->motor2_closed_ref_,
+      this->motor2_open_ref_valid_, this->motor2_open_ref_);
+
+  if (this->motion_state_ == GateMotionState::PED_OPENING || this->motion_state_ == GateMotionState::PED_OPENED) {
+    this->overall_percent_raw_ = this->motor1_percent_;
+  } else {
+    this->overall_percent_raw_ = (this->motor1_percent_ + this->motor2_percent_) / 2.0f;
+  }
+
+  this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
+}
+
 void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, const std::string &raw_line) {
   this->last_frame_ = frame;
   this->has_frame_ = true;
@@ -146,14 +245,7 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
   this->motor1_raw_ = frame[3];
   this->motor2_raw_ = frame[6];
 
-  this->motor1_percent_ = this->scale_position_(this->motor1_raw_);
-  this->motor2_percent_ = this->scale_position_(this->motor2_raw_);
-
-  if (this->motion_state_ == GateMotionState::PED_OPENING || this->motion_state_ == GateMotionState::PED_OPENED) {
-    this->overall_percent_ = this->motor1_percent_;
-  } else {
-    this->overall_percent_ = (this->motor1_percent_ + this->motor2_percent_) / 2.0f;
-  }
+  this->recalculate_positions_();
 
   switch (frame[2]) {
     case 0xCC:
@@ -165,20 +257,23 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
       } else {
         this->set_motion_state_(GateMotionState::OPENING);
       }
+      this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
       break;
 
     case 0xAA:
       this->obstruction_active_ = false;
-      if (this->overall_percent_ > 90.0f) {
+      if (this->overall_percent_raw_ > 90.0f) {
         this->set_motion_state_(GateMotionState::OPENED);
-      } else if (this->overall_percent_ < 10.0f) {
+      } else if (this->overall_percent_raw_ < 10.0f) {
         this->set_motion_state_(GateMotionState::CLOSED);
       }
+      this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
       break;
 
     case 0xEE:
       this->obstruction_active_ = true;
       this->set_motion_state_(GateMotionState::STOPPED);
+      this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
       break;
 
     case 0xDB:
@@ -189,7 +284,8 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
       } else {
         this->set_motion_state_(GateMotionState::PED_OPENING);
       }
-      this->overall_percent_ = this->motor1_percent_;
+      this->overall_percent_raw_ = this->motor1_percent_;
+      this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
       break;
 
     default:
@@ -227,33 +323,64 @@ std::string CB19GateComponent::extract_protocol_state_(const std::string &line) 
   return trim_copy(payload);
 }
 
+void CB19GateComponent::learn_current_refs_from_state_(const std::string &state) {
+  if (state == "Closed") {
+    this->motor1_closed_ref_ = this->motor1_raw_;
+    this->motor2_closed_ref_ = this->motor2_raw_;
+    this->motor1_closed_ref_valid_ = true;
+    this->motor2_closed_ref_valid_ = true;
+    ESP_LOGI(TAG, "Learned CLOSED refs: motor1=%u motor2=%u", this->motor1_closed_ref_, this->motor2_closed_ref_);
+  } else if (state == "Opened") {
+    this->motor1_open_ref_ = this->motor1_raw_;
+    this->motor2_open_ref_ = this->motor2_raw_;
+    this->motor1_open_ref_valid_ = true;
+    this->motor2_open_ref_valid_ = true;
+    ESP_LOGI(TAG, "Learned OPEN refs: motor1=%u motor2=%u", this->motor1_open_ref_, this->motor2_open_ref_);
+  } else if (state == "PedOpened") {
+    this->motor1_open_ref_ = this->motor1_raw_;
+    this->motor1_open_ref_valid_ = true;
+    ESP_LOGI(TAG, "Learned PED OPEN ref: motor1=%u", this->motor1_open_ref_);
+  }
+}
+
 void CB19GateComponent::apply_state_line_(const std::string &line) {
   const std::string state = this->extract_protocol_state_(line);
   this->last_state_line_ = state;
 
+  this->learn_current_refs_from_state_(state);
+  this->recalculate_positions_();
+
   if (state == "Opening") {
     this->obstruction_active_ = false;
     this->set_motion_state_(GateMotionState::OPENING);
+    this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
   } else if (state == "Opened") {
     this->obstruction_active_ = false;
-    this->overall_percent_ = 100.0f;
     this->set_motion_state_(GateMotionState::OPENED);
+    this->overall_percent_raw_ = 100.0f;
+    this->overall_percent_ = 100.0f;
   } else if (state == "Closing") {
     this->obstruction_active_ = false;
     this->set_motion_state_(GateMotionState::CLOSING);
+    this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
   } else if (state == "Closed") {
     this->obstruction_active_ = false;
-    this->overall_percent_ = 0.0f;
     this->set_motion_state_(GateMotionState::CLOSED);
+    this->overall_percent_raw_ = 0.0f;
+    this->overall_percent_ = 0.0f;
   } else if (state == "Stopped") {
     this->set_motion_state_(GateMotionState::STOPPED);
+    this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
   } else if (state == "PedOpening") {
     this->obstruction_active_ = false;
     this->set_motion_state_(GateMotionState::PED_OPENING);
+    this->overall_percent_raw_ = this->motor1_percent_;
+    this->overall_percent_ = this->apply_cover_calibration_(this->overall_percent_raw_);
   } else if (state == "PedOpened") {
     this->obstruction_active_ = false;
-    this->overall_percent_ = this->motor1_percent_;
     this->set_motion_state_(GateMotionState::PED_OPENED);
+    this->overall_percent_raw_ = 100.0f;
+    this->overall_percent_ = 100.0f;
   } else {
     ESP_LOGD(TAG, "Unhandled state line payload: %s", state.c_str());
   }
@@ -283,7 +410,7 @@ void CB19GateComponent::publish_all_() {
   }
 
   const bool moving = this->is_moving_state_(this->motion_state_);
-  const bool fully_open = this->motion_state_ == GateMotionState::OPENED;
+  const bool fully_open = this->motion_state_ == GateMotionState::OPENED || this->motion_state_ == GateMotionState::PED_OPENED;
   const bool fully_closed = this->motion_state_ == GateMotionState::CLOSED;
 
   if (this->moving_binary_sensor_ != nullptr) {
@@ -305,16 +432,6 @@ void CB19GateComponent::publish_all_() {
   if (this->cover_ != nullptr) {
     this->cover_->sync_from_parent();
   }
-}
-
-float CB19GateComponent::scale_position_(uint8_t raw) const {
-  if (this->max_position_ <= this->min_position_) {
-    return 0.0f;
-  }
-
-  const float value = 100.0f * float(raw - this->min_position_) /
-                      float(this->max_position_ - this->min_position_);
-  return std::max(0.0f, std::min(100.0f, value));
 }
 
 std::string CB19GateComponent::motion_state_to_string_(GateMotionState state) const {

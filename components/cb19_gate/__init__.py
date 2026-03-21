@@ -1,16 +1,25 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import uart, cover, sensor, text_sensor, binary_sensor, button
+from esphome.components import (
+    uart,
+    cover,
+    sensor,
+    text_sensor,
+    binary_sensor,
+    button,
+    number,
+)
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
     CONF_UART_ID,
+    ENTITY_CATEGORY_CONFIG,
     ENTITY_CATEGORY_DIAGNOSTIC,
     ICON_COUNTER,
     ICON_PERCENT,
 )
 
-AUTO_LOAD = ["cover", "sensor", "text_sensor", "binary_sensor", "button"]
+AUTO_LOAD = ["cover", "sensor", "text_sensor", "binary_sensor", "button", "number"]
 DEPENDENCIES = ["uart"]
 
 CONF_COVER = "cover"
@@ -30,11 +39,15 @@ CONF_FULLY_OPEN = "fully_open"
 CONF_FULLY_CLOSED = "fully_closed"
 CONF_PHOTOCELL_ACTIVE = "photocell_active"
 CONF_OBSTRUCTION_ACTIVE = "obstruction_active"
+CONF_OPENING_START_PERCENT = "opening_start_percent"
+CONF_CLOSING_START_PERCENT = "closing_start_percent"
 
 cb19_ns = cg.esphome_ns.namespace("cb19_gate")
 CB19GateComponent = cb19_ns.class_("CB19GateComponent", cg.Component, uart.UARTDevice)
 CB19GateCover = cb19_ns.class_("CB19GateCover", cover.Cover)
 CB19PedestrianButton = cb19_ns.class_("CB19PedestrianButton", button.Button)
+CB19OpeningStartNumber = cb19_ns.class_("CB19OpeningStartNumber", number.Number)
+CB19ClosingStartNumber = cb19_ns.class_("CB19ClosingStartNumber", number.Number)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -42,19 +55,44 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_MIN_POSITION, default=1): cv.int_range(min=0, max=255),
         cv.Optional(CONF_MAX_POSITION, default=225): cv.int_range(min=1, max=255),
-
         cv.Optional(CONF_COVER): cover.cover_schema(CB19GateCover).extend(
             {
                 cv.Optional(CONF_NAME, default="CB19 Gate"): cv.string,
             }
         ),
-
         cv.Optional(CONF_PEDESTRIAN_BUTTON): button.button_schema(CB19PedestrianButton).extend(
             {
                 cv.Optional(CONF_NAME, default="Pedestrian Open"): cv.string,
             }
         ),
-
+        cv.Optional(CONF_OPENING_START_PERCENT): number.number_schema(
+            CB19OpeningStartNumber,
+            unit_of_measurement="%",
+            icon=ICON_PERCENT,
+            entity_category=ENTITY_CATEGORY_CONFIG,
+        ).extend(
+            {
+                cv.Optional(CONF_NAME, default="Opening Start Percent"): cv.string,
+                cv.Optional("initial_value", default=56.0): cv.float_range(min=0.0, max=99.0),
+                cv.Optional("min_value", default=0.0): cv.float_range(min=0.0, max=99.0),
+                cv.Optional("max_value", default=99.0): cv.float_range(min=0.0, max=100.0),
+                cv.Optional("step", default=1.0): cv.float_range(min=0.1, max=10.0),
+            }
+        ),
+        cv.Optional(CONF_CLOSING_START_PERCENT): number.number_schema(
+            CB19ClosingStartNumber,
+            unit_of_measurement="%",
+            icon=ICON_PERCENT,
+            entity_category=ENTITY_CATEGORY_CONFIG,
+        ).extend(
+            {
+                cv.Optional(CONF_NAME, default="Closing Start Percent"): cv.string,
+                cv.Optional("initial_value", default=44.0): cv.float_range(min=1.0, max=100.0),
+                cv.Optional("min_value", default=1.0): cv.float_range(min=0.0, max=100.0),
+                cv.Optional("max_value", default=100.0): cv.float_range(min=1.0, max=100.0),
+                cv.Optional("step", default=1.0): cv.float_range(min=0.1, max=10.0),
+            }
+        ),
         cv.Optional(CONF_MOTOR1_RAW): sensor.sensor_schema(
             accuracy_decimals=0,
             icon=ICON_COUNTER,
@@ -119,6 +157,34 @@ async def to_code(config):
         await button.register_button(btn, conf)
         cg.add(btn.set_parent(var))
         cg.add(var.set_pedestrian_button(btn))
+
+    if CONF_OPENING_START_PERCENT in config:
+        conf = config[CONF_OPENING_START_PERCENT]
+        num = cg.new_Pvariable(conf[CONF_ID])
+        await number.register_number(
+            num,
+            conf,
+            min_value=conf["min_value"],
+            max_value=conf["max_value"],
+            step=conf["step"],
+        )
+        cg.add(num.set_parent(var))
+        cg.add(num.set_initial_value(conf["initial_value"]))
+        cg.add(var.set_opening_start_number(num))
+
+    if CONF_CLOSING_START_PERCENT in config:
+        conf = config[CONF_CLOSING_START_PERCENT]
+        num = cg.new_Pvariable(conf[CONF_ID])
+        await number.register_number(
+            num,
+            conf,
+            min_value=conf["min_value"],
+            max_value=conf["max_value"],
+            step=conf["step"],
+        )
+        cg.add(num.set_parent(var))
+        cg.add(num.set_initial_value(conf["initial_value"]))
+        cg.add(var.set_closing_start_number(num))
 
     if CONF_MOTOR1_RAW in config:
         sens = await sensor.new_sensor(config[CONF_MOTOR1_RAW])

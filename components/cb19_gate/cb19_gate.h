@@ -6,6 +6,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/button/button.h"
 #include "esphome/components/cover/cover.h"
+#include "esphome/components/number/number.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/uart/uart.h"
@@ -47,6 +48,27 @@ class CB19PedestrianButton : public button::Button {
   CB19GateComponent *parent_{nullptr};
 };
 
+class CB19CalibrationNumber : public number::Number {
+ public:
+  void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
+  void set_initial_value(float value) { this->initial_value_ = value; }
+  float get_initial_value() const { return this->initial_value_; }
+
+ protected:
+  CB19GateComponent *parent_{nullptr};
+  float initial_value_{0.0f};
+};
+
+class CB19OpeningStartNumber : public CB19CalibrationNumber {
+ protected:
+  void control(float value) override;
+};
+
+class CB19ClosingStartNumber : public CB19CalibrationNumber {
+ protected:
+  void control(float value) override;
+};
+
 class CB19GateComponent : public Component, public uart::UARTDevice {
  public:
   explicit CB19GateComponent(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
@@ -62,6 +84,9 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
 
   void set_cover(CB19GateCover *cover) { this->cover_ = cover; }
   void set_pedestrian_button(CB19PedestrianButton *button) { this->pedestrian_button_ = button; }
+
+  void set_opening_start_number(CB19CalibrationNumber *n) { this->opening_start_number_ = n; }
+  void set_closing_start_number(CB19CalibrationNumber *n) { this->closing_start_number_ = n; }
 
   void set_motor1_raw_sensor(sensor::Sensor *s) { this->motor1_raw_sensor_ = s; }
   void set_motor2_raw_sensor(sensor::Sensor *s) { this->motor2_raw_sensor_ = s; }
@@ -87,6 +112,11 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   float get_overall_position_percent() const { return this->overall_percent_; }
   GateMotionState get_motion_state() const { return this->motion_state_; }
 
+  float get_opening_start_percent() const { return this->opening_start_percent_; }
+  float get_closing_start_percent() const { return this->closing_start_percent_; }
+  void set_opening_start_percent(float value);
+  void set_closing_start_percent(float value);
+
  protected:
   void send_command_(const std::string &cmd);
   void parse_line_(const std::string &line);
@@ -95,7 +125,11 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void apply_state_line_(const std::string &line);
   std::string extract_protocol_state_(const std::string &line);
   void publish_all_();
-  float scale_position_(uint8_t raw) const;
+  float scale_position_fallback_(uint8_t raw) const;
+  float scale_motor_position_(uint8_t raw, bool closed_valid, uint8_t closed_ref, bool open_valid, uint8_t open_ref) const;
+  void recalculate_positions_();
+  float apply_cover_calibration_(float base_percent) const;
+  void learn_current_refs_from_state_(const std::string &state);
   std::string motion_state_to_string_(GateMotionState state) const;
   bool is_moving_state_(GateMotionState state) const;
   void set_motion_state_(GateMotionState state);
@@ -113,7 +147,21 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   uint8_t motor2_raw_{0};
   float motor1_percent_{0.0f};
   float motor2_percent_{0.0f};
+  float overall_percent_raw_{0.0f};
   float overall_percent_{0.0f};
+
+  bool motor1_closed_ref_valid_{false};
+  bool motor1_open_ref_valid_{false};
+  bool motor2_closed_ref_valid_{false};
+  bool motor2_open_ref_valid_{false};
+
+  uint8_t motor1_closed_ref_{0};
+  uint8_t motor1_open_ref_{0};
+  uint8_t motor2_closed_ref_{0};
+  uint8_t motor2_open_ref_{0};
+
+  float opening_start_percent_{56.0f};
+  float closing_start_percent_{44.0f};
 
   bool photocell_active_{false};
   bool obstruction_active_{false};
@@ -129,6 +177,8 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
 
   CB19GateCover *cover_{nullptr};
   CB19PedestrianButton *pedestrian_button_{nullptr};
+  CB19CalibrationNumber *opening_start_number_{nullptr};
+  CB19CalibrationNumber *closing_start_number_{nullptr};
 
   sensor::Sensor *motor1_raw_sensor_{nullptr};
   sensor::Sensor *motor2_raw_sensor_{nullptr};
