@@ -192,8 +192,8 @@ UART → Parser → State Machine → ESPHome Entities
 
 ```yaml
 external_components:
-  - source: github://YOUR_USERNAME/esphome-cb19-gate
-    components: [cb19_gate]
+  - source: https://github.com/szokezoltan95/CB19-esphome
+    components: [cb19_esphome]
 
 uart:
   id: gate_uart
