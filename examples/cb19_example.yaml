@@ -48,7 +48,7 @@ cb19_gate:
 
   pedestrian_button:
     name: "Pedestrian Open"
-    
+
   opening_start_percent:
     name: "Opening Start Percent"
     initial_value: 56
@@ -77,6 +77,18 @@ cb19_gate:
 
   overall_percent:
     name: "Gate Position"
+
+  motor1_speed:
+    name: "Motor1 Speed"
+
+  motor1_load:
+    name: "Motor1 Load"
+
+  motor2_speed:
+    name: "Motor2 Speed"
+
+  motor2_load:
+    name: "Motor2 Load"
 
   last_state:
     name: "Last State"

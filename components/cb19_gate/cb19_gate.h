@@ -94,6 +94,11 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void set_motor2_percent_sensor(sensor::Sensor *s) { this->motor2_percent_sensor_ = s; }
   void set_overall_percent_sensor(sensor::Sensor *s) { this->overall_percent_sensor_ = s; }
 
+  void set_motor1_speed_sensor(sensor::Sensor *s) { this->motor1_speed_sensor_ = s; }
+  void set_motor1_load_sensor(sensor::Sensor *s) { this->motor1_load_sensor_ = s; }
+  void set_motor2_speed_sensor(sensor::Sensor *s) { this->motor2_speed_sensor_ = s; }
+  void set_motor2_load_sensor(sensor::Sensor *s) { this->motor2_load_sensor_ = s; }
+
   void set_last_state_text_sensor(text_sensor::TextSensor *s) { this->last_state_text_sensor_ = s; }
   void set_last_ack_text_sensor(text_sensor::TextSensor *s) { this->last_ack_text_sensor_ = s; }
   void set_last_rs_text_sensor(text_sensor::TextSensor *s) { this->last_rs_text_sensor_ = s; }
@@ -150,6 +155,11 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   float overall_percent_raw_{0.0f};
   float overall_percent_{0.0f};
 
+  uint8_t motor1_speed_{0};
+  uint8_t motor1_load_{0};
+  uint8_t motor2_speed_{0};
+  uint8_t motor2_load_{0};
+
   bool motor1_closed_ref_valid_{false};
   bool motor1_open_ref_valid_{false};
   bool motor2_closed_ref_valid_{false};
@@ -185,6 +195,11 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   sensor::Sensor *motor1_percent_sensor_{nullptr};
   sensor::Sensor *motor2_percent_sensor_{nullptr};
   sensor::Sensor *overall_percent_sensor_{nullptr};
+
+  sensor::Sensor *motor1_speed_sensor_{nullptr};
+  sensor::Sensor *motor1_load_sensor_{nullptr};
+  sensor::Sensor *motor2_speed_sensor_{nullptr};
+  sensor::Sensor *motor2_load_sensor_{nullptr};
 
   text_sensor::TextSensor *last_state_text_sensor_{nullptr};
   text_sensor::TextSensor *last_ack_text_sensor_{nullptr};

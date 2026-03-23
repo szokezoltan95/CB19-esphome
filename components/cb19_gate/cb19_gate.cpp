@@ -204,7 +204,8 @@ float CB19GateComponent::apply_cover_calibration_(float base_percent) const {
 
   if (this->motion_state_ == GateMotionState::OPENING || this->motion_state_ == GateMotionState::PED_OPENING) {
     if (this->opening_start_percent_ < 99.0f) {
-      value = (base_percent - this->opening_start_percent_) * 100.0f / (100.0f - this->opening_start_percent_);
+      value = (base_percent - this->opening_start_percent_) * 100.0f /
+              (100.0f - this->opening_start_percent_);
     }
   } else if (this->motion_state_ == GateMotionState::CLOSING) {
     if (this->closing_start_percent_ > 0.0f) {
@@ -243,7 +244,12 @@ void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, con
   this->photocell_active_ = (frame[0] == 0x62);
 
   this->motor1_raw_ = frame[3];
+  this->motor1_speed_ = frame[4];
+  this->motor1_load_ = frame[5];
+
   this->motor2_raw_ = frame[6];
+  this->motor2_speed_ = frame[7];
+  this->motor2_load_ = frame[8];
 
   this->recalculate_positions_();
 
@@ -409,8 +415,23 @@ void CB19GateComponent::publish_all_() {
     this->overall_percent_sensor_->publish_state(this->overall_percent_);
   }
 
+  if (this->motor1_speed_sensor_ != nullptr) {
+    this->motor1_speed_sensor_->publish_state(this->motor1_speed_);
+  }
+  if (this->motor1_load_sensor_ != nullptr) {
+    this->motor1_load_sensor_->publish_state(this->motor1_load_);
+  }
+  if (this->motor2_speed_sensor_ != nullptr) {
+    this->motor2_speed_sensor_->publish_state(this->motor2_speed_);
+  }
+  if (this->motor2_load_sensor_ != nullptr) {
+    this->motor2_load_sensor_->publish_state(this->motor2_load_);
+  }
+
   const bool moving = this->is_moving_state_(this->motion_state_);
-  const bool fully_open = this->motion_state_ == GateMotionState::OPENED || this->motion_state_ == GateMotionState::PED_OPENED;
+  const bool fully_open =
+      this->motion_state_ == GateMotionState::OPENED ||
+      this->motion_state_ == GateMotionState::PED_OPENED;
   const bool fully_closed = this->motion_state_ == GateMotionState::CLOSED;
 
   if (this->moving_binary_sensor_ != nullptr) {
