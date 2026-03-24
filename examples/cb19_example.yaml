@@ -48,27 +48,27 @@ cb19_gate:
   pedestrian_button:
     name: "Pedestrian Open"
 
-  apply_parameters_button:
-    name: "Apply Parameters"
-
   reload_parameters_button:
-    name: "Reload Parameters"
+    name: "1. Read Parameters"
+
+  apply_parameters_button:
+    name: "2. Write Parameters"
 
   revert_parameters_button:
-    name: "Revert Pending Parameters"
-
-  factory_reset_button:
-    name: "Factory Reset"
-    disabled_by_default: true
-
-  auto_learn_button:
-    name: "Auto Learn"
+    name: "3. Revert Pending Parameters"
 
   remote_learn_button:
-    name: "Remote Learn"
+    name: "4. Add Remote"
 
   clear_remote_learn_button:
-    name: "Clear Remote Learn"
+    name: "5. Remove Remote"
+
+  auto_learn_button:
+    name: "6. Gate Auto Learn"
+
+  factory_reset_button:
+    name: "7. Factory Reset"
+    disabled_by_default: true
 
   opening_start_percent:
     name: "Opening Start Percent"
