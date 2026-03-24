@@ -95,7 +95,7 @@ cb19_gate:
   f9: { name: "F9 Close Wing Delay" }
   fa: { name: "FA Auto Close" }
   fb: { name: "FB Safety Mode" }
-  fc: { name: "FC Wicket Mode" }
+  fc: { name: "FC Pedestrian Mode" }
   fd: { name: "FD Flashing Lamp" }
   fe: { name: "FE Photocell 1" }
   ff: { name: "FF Photocell 2" }

@@ -53,26 +53,151 @@ CONF_CLEAR_REMOTE_LEARN_BUTTON = "clear_remote_learn_button"
 
 PARAM_KEYS = ["f1","f2","f3","f4","f5","f6","f7","f8","f9","fa","fb","fc","fd","fe","ff","fg","fh","fi","fj","fk"]
 PARAM_OPTIONS = {
-    "f1": ["F1-0 | Normal", "F1-1 | Limit switch"],
-    "f2": ["F2-0 | 2.0 A", "F2-1 | 3.0 A", "F2-2 | 4.0 A", "F2-3 | 5.0 A"],
-    "f3": ["F3-0 | 2.0 A", "F3-1 | 3.0 A", "F3-2 | 4.0 A", "F3-3 | 5.0 A"],
-    "f4": ["F4-0 | Level 1", "F4-1 | Level 2", "F4-2 | Level 3", "F4-3 | Level 4"],
-    "f5": ["F5-0 | Level 1", "F5-1 | Level 2", "F5-2 | Level 3", "F5-3 | Level 4"],
-    "f6": ["F6-0 | Level 1", "F6-1 | Level 2", "F6-2 | Level 3", "F6-3 | Level 4"],
-    "f7": ["F7-0 | Level 1", "F7-1 | Level 2", "F7-2 | Level 3", "F7-3 | Level 4", "F7-4 | Level 5"],
-    "f8": [f"F8-{i} | Delay {i}" for i in range(10)],
-    "f9": [f"F9-{i} | Delay {i}" for i in range(10)],
-    "fa": ["FA-0 | Disabled", "FA-1 | 3 s", "FA-2 | 10 s", "FA-3 | 20 s", "FA-4 | 40 s", "FA-5 | 60 s", "FA-6 | 90 s", "FA-7 | 180 s", "FA-8 | 300 s"],
-    "fb": ["FB-0 | Mode 1", "FB-1 | Mode 2", "FB-2 | Mode 3", "FB-3 | Mode 4", "FB-4 | Mode 5", "FB-5 | Mode 6", "FB-6 | Mode 7"],
-    "fc": ["FC-0 | Disabled", "FC-1 | Enabled"],
-    "fd": ["FD-0 | Disabled", "FD-1 | Enabled"],
-    "fe": ["FE-0 | Disabled", "FE-1 | Enabled"],
-    "ff": ["FF-0 | Disabled", "FF-1 | Enabled"],
-    "fg": ["FG-0 | Disabled", "FG-1 | Enabled"],
-    "fh": ["FH-0 | Disabled", "FH-1 | Enabled"],
-    "fi": ["FI-0 | Normal", "FI-1 | Reversed"],
-    "fj": ["FJ-0 | Double leaf", "FJ-1 | Single leaf"],
-    "fk": ["FK-0 | 0.0 s", "FK-1 | 0.1 s", "FK-2 | 0.2 s", "FK-3 | 0.3 s", "FK-4 | 0.4 s", "FK-5 | 0.5 s", "FK-6 | 0.6 s"],
+    "f1": [
+        "F1-0 | Normal (default)",
+        "F1-1 | Limit switch",
+    ],
+
+    "f2": [
+        "F2-0 | 2A",
+        "F2-1 | 3A (default)",
+        "F2-2 | 4A",
+        "F2-3 | 5A",
+    ],
+
+    "f3": [
+        "F3-0 | 2A",
+        "F3-1 | 3A (default)",
+        "F3-2 | 4A",
+        "F3-3 | 5A",
+    ],
+
+    "f4": [
+        "F4-0 | 40%",
+        "F4-1 | 50%",
+        "F4-2 | 75% (default)",
+        "F4-3 | 100%",
+    ],
+
+    "f5": [
+        "F5-0 | 40%",
+        "F5-1 | 50%",
+        "F5-2 | 75% (default)",
+        "F5-3 | 100%",
+    ],
+
+    "f6": [
+        "F6-0 | 40%",
+        "F6-1 | 50% (default)",
+        "F6-2 | 60%",
+        "F6-3 | 70%",
+    ],
+
+    "f7": [
+        "F7-0 | 75%",
+        "F7-1 | 80%",
+        "F7-2 | 85%",
+        "F7-3 | 90% (default)",
+        "F7-4 | 95%",
+    ],
+
+    "f8": [
+        "F8-0 | 0 s",
+        "F8-1 | 2 s (default)",
+        "F8-2 | 5 s",
+        "F8-3 | 10 s",
+        "F8-4 | 15 s",
+        "F8-5 | 20 s",
+        "F8-6 | 25 s",
+        "F8-7 | 35 s",
+        "F8-8 | 45 s",
+        "F8-9 | 55 s",
+    ],
+
+    "f9": [
+        "F9-0 | 0 s",
+        "F9-1 | 2 s (default)",
+        "F9-2 | 5 s",
+        "F9-3 | 10 s",
+        "F9-4 | 15 s",
+        "F9-5 | 20 s",
+        "F9-6 | 25 s",
+        "F9-7 | 35 s",
+        "F9-8 | 45 s",
+        "F9-9 | 55 s",
+    ],
+
+    "fa": [
+        "FA-0 | Disabled (default)",
+        "FA-1 | 3 s",
+        "FA-2 | 10 s",
+        "FA-3 | 20 s",
+        "FA-4 | 40 s",
+        "FA-5 | 60 s",
+        "FA-6 | 120 s",
+        "FA-7 | 180 s",
+        "FA-8 | 300 s",
+    ],
+
+    "fb": [
+        "FB-0 | Mode 1 (default)",
+        "FB-1 | Mode 2",
+        "FB-2 | Mode 3",
+        "FB-3 | Mode 4",
+        "FB-4 | Mode 5",
+        "FB-5 | Mode 6",
+        "FB-6 | Mode 7",
+    ],
+
+    "fc": [
+        "FC-0 | Disabled",
+        "FC-1 | Enabled (default)",
+    ],
+
+    "fd": [
+        "FD-0 | Disabled (default)",
+        "FD-1 | Enabled",
+    ],
+
+    "fe": [
+        "FE-0 | Disabled (default)",
+        "FE-1 | Enabled",
+    ],
+
+    "ff": [
+        "FF-0 | Disabled (default)",
+        "FF-1 | Enabled",
+    ],
+
+    "fg": [
+        "FG-0 | Disabled (default)",
+        "FG-1 | Enabled",
+    ],
+
+    "fh": [
+        "FH-0 | Normal (default)",
+        "FH-1 | Electric lock",
+    ],
+
+    "fi": [
+        "FI-0 | Up",
+        "FI-1 | Down (default)",
+    ],
+
+    "fj": [
+        "FJ-0 | Double wing (default)",
+        "FJ-1 | Single wing",
+    ],
+
+    "fk": [
+        "FK-0 | Disabled (default)",
+        "FK-1 | 0.1 s",
+        "FK-2 | 0.2 s",
+        "FK-3 | 0.3 s",
+        "FK-4 | 0.4 s",
+        "FK-5 | 0.5 s",
+        "FK-6 | 0.6 s",
+    ],
 }
 
 cb19_ns = cg.esphome_ns.namespace("cb19_gate")
