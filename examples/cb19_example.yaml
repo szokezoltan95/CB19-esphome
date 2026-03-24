@@ -19,7 +19,6 @@ ota:
 wifi:
   ssid: "YOUR_SSID"
   password: "YOUR_WIFI_PASSWORD"
-
   ap:
     ssid: "CB19 Gate Fallback"
     password: "12345678"
@@ -30,7 +29,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/szokezoltan95/CB19-esphome
-      ref: main
+      ref: full-feature
     components: [cb19_gate]
 
 uart:
@@ -49,6 +48,28 @@ cb19_gate:
   pedestrian_button:
     name: "Pedestrian Open"
 
+  apply_parameters_button:
+    name: "Apply Parameters"
+
+  reload_parameters_button:
+    name: "Reload Parameters"
+
+  revert_parameters_button:
+    name: "Revert Pending Parameters"
+
+  factory_reset_button:
+    name: "Factory Reset"
+    disabled_by_default: true
+
+  auto_learn_button:
+    name: "Auto Learn"
+
+  remote_learn_button:
+    name: "Remote Learn"
+
+  clear_remote_learn_button:
+    name: "Clear Remote Learn"
+
   opening_start_percent:
     name: "Opening Start Percent"
     initial_value: 56
@@ -63,53 +84,74 @@ cb19_gate:
     max_value: 100
     step: 1
 
+  f1: { name: "F1 Motor Type" }
+  f2: { name: "F2 Opening Force" }
+  f3: { name: "F3 Closing Force" }
+  f4: { name: "F4 Opening Speed" }
+  f5: { name: "F5 Closing Speed" }
+  f6: { name: "F6 Slow Speed" }
+  f7: { name: "F7 Slowdown Start" }
+  f8: { name: "F8 Open Wing Delay" }
+  f9: { name: "F9 Close Wing Delay" }
+  fa: { name: "FA Auto Close" }
+  fb: { name: "FB Safety Mode" }
+  fc: { name: "FC Wicket Mode" }
+  fd: { name: "FD Flashing Lamp" }
+  fe: { name: "FE Photocell 1" }
+  ff: { name: "FF Photocell 2" }
+  fg: { name: "FG Buzzer" }
+  fh: { name: "FH Electric Lock" }
+  fi: { name: "FI LED Direction" }
+  fj: { name: "FJ Gate Type" }
+  fk: { name: "FK Back Release" }
+
+  learn_status:
+    name: "Learn Status"
+  learning_active:
+    name: "Learning Active"
+
+  param_current:
+    name: "Current Param Block"
+  param_pending:
+    name: "Pending Param Block"
+  params_dirty:
+    name: "Parameters Dirty"
+  config_warning:
+    name: "Config Warning"
+
   motor1_raw:
     name: "Motor1 Raw"
-
   motor2_raw:
     name: "Motor2 Raw"
-
   motor1_percent:
     name: "Motor1 Position"
-
   motor2_percent:
     name: "Motor2 Position"
-
   overall_percent:
     name: "Gate Position"
-
   motor1_speed:
     name: "Motor1 Speed"
-
   motor1_load:
     name: "Motor1 Load"
-
   motor2_speed:
     name: "Motor2 Speed"
-
   motor2_load:
     name: "Motor2 Load"
 
   last_state:
     name: "Last State"
-
   last_ack:
     name: "Last Ack"
-
   last_rs:
     name: "Last RS"
 
   moving:
     name: "Moving"
-
   fully_open:
     name: "Fully Open"
-
   fully_closed:
     name: "Fully Closed"
-
   photocell_active:
     name: "Photocell"
-
   obstruction_active:
     name: "Obstruction"
