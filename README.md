@@ -1,206 +1,182 @@
 # CB19 ESPHome Gate Controller
 
-Custom ESPHome component for controlling CB19 gate controllers over UART (RS protocol).
+Custom ESPHome component for CB19 gate controllers over UART.
 
-This project replaces the original WiFi module and enables full local control and monitoring of the gate through Home Assistant.
+This project replaces the original WiFi module with a fully local ESPHome integration. In the current state it provides gate control, state feedback, protocol-level diagnostics, parameter read/write support, remote-management commands, learn-status polling, and Home Assistant friendly configuration entities.
 
----
+## Current capabilities
 
-## Overview
+- Open, close, stop, and pedestrian open
+- Real-time position tracking from `ACK RS` frames
+- Motion state detection from both `RS` frames and `$V1PKF...` event lines
+- Photocell and obstruction indication
+- Motor raw position, speed, and load diagnostics for both motors
+- Parameter read/write using `RP,1` and `WP,1`
+- Pending vs current parameter tracking
+- Manual actions for:
+  - read parameters
+  - write parameters
+  - revert pending parameters
+  - add remote
+  - remove remote
+  - auto learn
+  - factory reset
+- Learn-status polling via `READ LEARN STATUS`
+- Home Assistant configuration entities for all F-code parameters
+- Local calibration for cover percentage handling
 
-The CB19 gate controller communicates over a UART-based ASCII protocol.  
-This project implements that protocol inside ESPHome, allowing you to:
+## Hardware
 
-- fully control the gate (open, close, stop, pedestrian mode)
-- read real-time position and movement state
-- detect obstruction and photocell events
-- integrate everything seamlessly into Home Assistant
+Required:
 
----
-
-## Features
-
-- Open / Close / Stop / Pedestrian control
-- Real-time position tracking (based on RS frames)
-- Motion state detection (opening, closing, idle)
-- Obstruction and photocell monitoring
-- Adaptive polling to avoid overloading the controller
-- Live calibration from Home Assistant
-- Fully local operation (no cloud)
-
----
-
-## Hardware Requirements
-
-To build the system you will need:
-
-- ESP32 (tested on `esp32_devkitc_v4`)
+- ESP32
 - UART connection to the CB19 controller
-- Voltage level adaptation (mandatory)
+- level shifting on Gate TX -> ESP RX
 
----
+Typical tested divider:
 
-## Wiring
-
-The CB19 controller uses higher voltage logic levels than the ESP32.
-
-Connecting it directly **will damage the ESP32**.
-
-### Voltage divider (required)
-
-Connection:
+```text
+Gate TX ---[10k]---+--- ESP RX
+                   |
+                 [18k]
+                   |
+                  GND
 ```
-    Gate TX ---[10k]---+--- ESP RX
-                       |
-                     [18k]
-                       |
-                      GND
-```
-Notes:
-
-- Never connect Gate TX directly to ESP RX
-- ESP TX → Gate RX is typically safe directly
-- Keep wires short and clean to avoid noise
-
----
-
-## Custom PCB (Fusion 360)
-
-A ready-to-use PCB design is included in the repository:
-
-    docs/cb19-gate-espboard.fbrd
-
-This design already includes:
-
-- correct resistor divider
-- proper routing
-- ESP integration
 
 Important:
 
-- R1 must be 10kΩ
-- R2 must be 18kΩ
+- Do not connect Gate TX directly to ESP RX
+- ESP TX -> Gate RX is typically usable directly
+- Keep UART wiring short and clean
 
----
+## ESPHome setup
 
-## ESPHome Configuration
+The component is loaded through `external_components`.
 
-A fully working example configuration is available:
+Example:
 
-    examples/cb19_example.yaml
+```yaml
+external_components:
+  - source: github://szokezoltan95/CB19-esphome@full-feature
+    components: [cb19_gate]
+```
 
-To use it:
+A complete example configuration is available in `examples/cb19_example.yaml`.
 
-1. Copy the file
-2. Add your WiFi credentials
-3. Check and modify RX and TX pins for your board
-4. Upload to ESP
+## Home Assistant entity model
 
-No additional changes are required.
+The integration exposes three practical groups of entities.
 
----
+### Main control
 
-## How It Works
+- gate cover
+- pedestrian open button
+- motion/open/closed/photocell/obstruction states
 
-The ESP communicates with the gate controller using ASCII commands over UART.
+### Diagnostics
 
-Commands are sent in the following format:
+- last state
+- last ACK
+- last RS
+- learn status
+- config warning
+- current parameter block
+- pending parameter block
+- motor raw values
+- motor speed/load values
 
-    COMMAND;src=P0031DA2\r\n
+### Configuration
 
-Examples:
+Buttons are intentionally placed in the configuration category and named in a fixed order:
 
-- FULL OPEN → opens the gate
-- FULL CLOSE → closes the gate
-- STOP → stops movement
-- PED OPEN → pedestrian mode
-- RS → request status
+1. Read Parameters
+2. Write Parameters
+3. Revert Pending Parameters
+4. Add Remote
+5. Remove Remote
+6. Auto Learn
+7. Factory Reset
 
-The controller responds with:
+All F-code parameters are exposed as `select` entities.
 
-- ACK → command accepted
-- NAK → command rejected
-- ACK RS → status frame
+## Parameter workflow
 
----
+The intended workflow is:
 
-## Position Handling
+1. Change one or more F-code select entities in Home Assistant
+2. The new values are stored as pending values only
+3. Press **Write Parameters**
+4. The component sends a full `WP,1:` block
+5. It then performs a readback with `RP,1`
+6. Current and pending values are resynchronized
 
-The controller does not provide normalized position values.
+This prevents accidental writes for each individual change and mirrors the safer workflow we wanted for Home Assistant.
 
-Observed behavior:
+## Learn workflow
 
-- Opening starts around ~56%
-- Closing starts around ~44%
+`READ LEARN STATUS` is not exposed as a manual button. Instead:
 
-To correct this, the component provides two calibration values:
+- **Auto Learn** starts the learn procedure
+- the component polls learn status automatically about once per second
+- polling continues until success, failure, or timeout
+
+This mirrors the behavior of the original WiFi module more closely.
+
+## Cover calibration
+
+The controller does not report a directly normalized 0 to 100% position.
+
+Observed behavior from testing:
+
+- opening begins around ~56%
+- closing begins around ~44%
+
+The component therefore keeps two Home Assistant-adjustable calibration values:
 
 - Opening Start Percent
 - Closing Start Percent
 
-These can be adjusted directly from Home Assistant.
+These values correct the reported cover percentage without reflashing firmware.
 
-This allows:
+## Polling
 
-- correct 0–100% representation
-- accurate cover behavior
-- no need for reflashing
+Current strategy:
 
----
+- fast polling while moving
+- slower polling after motion stops
+- very slow polling when idle
+- periodic parameter resync with `RP,1`
 
-## Polling Strategy
+Polling is briefly suppressed after sending commands to avoid stepping on protocol traffic.
 
-To keep communication safe and stable:
+## Supported protocol features
 
-- During movement → polling every 200 ms
-- After movement → polling every 500 ms for 10 seconds
-- Idle → polling every 60 seconds
+Documented in more detail in `docs/protocol.md`:
 
-Additionally:
+- `FULL OPEN`
+- `FULL CLOSE`
+- `STOP`
+- `PED OPEN`
+- `RS`
+- `RP,1`
+- `WP,1`
+- `RESTORE`
+- `AUTO LEARN`
+- `READ LEARN STATUS`
+- `REMOTE LEARN`
+- `CLEAR REMOTE LEARN`
 
-- polling pauses briefly after sending a command
+## Notes on F1
 
-This ensures:
+For Home Assistant exposure, the Hall sensor mode is intentionally not presented as a selectable option. This keeps the configuration model simpler and avoids dynamic remapping of F2 and F3 option labels.
 
-- responsive updates
-- no overload of the controller
+## Repository structure
 
----
-
-## Project Structure
-
-- components/ → ESPHome custom component
-- examples/ → working YAML
-- docs/ → protocol documentation + PCB design file
-
----
+- `components/` custom ESPHome component
+- `examples/` example ESPHome YAML
+- `docs/` documentation and protocol notes
 
 ## Documentation
 
-Detailed protocol description is available here:
-
-    docs/protocol.md
-
----
-
-## Current Status
-
-- Communication stable
-- Commands reliable
-- Position tracking usable
-- Fully integrated with Home Assistant
-
----
-
-## Future Plans
-
-- Read and modify full configuration (F-codes)
-- Remote management (pairing remotes)
-- Full replacement of official mobile app
-- Advanced diagnostics
-
----
-
-## License
-
-MIT License
+- `README.md` project overview
+- `docs/protocol.md` protocol details, command list, status handling, and full F-code table
