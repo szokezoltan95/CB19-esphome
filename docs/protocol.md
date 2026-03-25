@@ -300,8 +300,9 @@ Entity name in Home Assistant should be presented as **Pedestrian Mode**.
 - `FI-1 | Down (default)`
 
 ### FJ
-- `FJ-0 | Double wing (default)`
 - `FJ-1 | Single wing`
+- `FJ-2 | Double wing (default)`
+
 
 ### FK
 - `FK-0 | Disabled (default)`
