@@ -54,21 +54,21 @@ Notes:
 ## Installation
 
 ### Add external component
-
+```
 external_components:
   - source: github://szokezoltan95/CB19-esphome@main
     components: [cb19_gate]
-
+```
 ### UART setup
-
+```
 uart:
   id: gate_uart
   tx_pin: GPIO17
   rx_pin: GPIO16
   baud_rate: 9600
-
+```
 ### Basic config
-
+```
 cb19_gate:
   id: gate_controller
   uart_id: gate_uart
@@ -78,9 +78,9 @@ cb19_gate:
 
   pedestrian_button:
     name: Pedestrian Open
-
+```
 Full example:
-examples/cb19_example.yaml
+`examples/cb19_example.yaml`
 
 ---
 
@@ -157,4 +157,4 @@ Adjust in HA:
 
 ## Protocol
 
-See docs/protocol.md
+See `docs/protocol.md`
