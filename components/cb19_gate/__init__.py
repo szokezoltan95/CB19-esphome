@@ -185,8 +185,8 @@ PARAM_OPTIONS = {
     ],
 
     "fj": [
-        "FJ-0 | Double wing (default)",
-        "FJ-1 | Single wing",
+        "FJ-0 | Single wing",
+        "FJ-1 | Double wing (default)",
     ],
 
     "fk": [
