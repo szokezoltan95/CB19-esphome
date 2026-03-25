@@ -36,13 +36,13 @@ Required:
 - Level shifting (Gate TX → ESP RX)
 
 Example divider:
-
+```
 Gate TX ---[10k]---+--- ESP RX
                   |
                 [18k]
                   |
                  GND
-
+```
 Notes:
 
 - Do NOT connect Gate TX directly to ESP RX
