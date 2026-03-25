@@ -184,6 +184,8 @@ The 20-value `WP,1` / `RP,1` block maps to F-codes in this order:
 
 ## F-code values currently exposed in Home Assistant
 
+Note: Some of the parameter value mappings differ from the user manual. The mappings below are based on the actual logic of the gate controller.
+
 ### F1
 - `F1-0 | Normal (default)`
 - `F1-1 | Limit switch`
@@ -300,8 +302,8 @@ Entity name in Home Assistant should be presented as **Pedestrian Mode**.
 - `FI-1 | Down (default)`
 
 ### FJ
-- `FJ-1 | Single wing`
-- `FJ-2 | Double wing (default)`
+- `FJ-0 | Single wing`
+- `FJ-1 | Double wing (default)`
 
 
 ### FK
