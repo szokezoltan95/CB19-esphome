@@ -6,7 +6,7 @@ This project replaces the original WiFi module with a fully local ESPHome integr
 
 
 
-##Experimental branch
+## Experimental branch
 
 This is the experimental branch for a major refactor of the code with the following:
 - Removal of the cover entity and switch to custom control
