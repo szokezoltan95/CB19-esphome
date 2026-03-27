@@ -29,6 +29,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/szokezoltan95/CB19-esphome
+      ref: experimental
     components: [cb19_gate]
 
 uart:
@@ -41,11 +42,17 @@ cb19_gate:
   id: gate_controller
   uart_id: gate_uart
 
-  cover:
-    name: "Gate"
-
   pedestrian_button:
     name: "Pedestrian Open"
+
+  open_button:
+    name: "Open"
+
+  close_button:
+    name: "Close"
+
+  stop_button:
+    name: "Stop"
 
   reload_parameters_button:
     name: "1. Read Parameters"
@@ -118,15 +125,23 @@ cb19_gate:
   config_warning:
     name: "Config Warning"
 
+  gate_state:
+    name: "Gate State"
+
+  last_ack:
+    name: "Last Ack"
+  last_rs:
+    name: "Last RS"
+
   motor1_raw:
     name: "Motor1 Raw"
   motor2_raw:
     name: "Motor2 Raw"
-  motor1_percent:
+  motor1_position:
     name: "Motor1 Position"
-  motor2_percent:
+  motor2_position:
     name: "Motor2 Position"
-  overall_percent:
+  gate_position:
     name: "Gate Position"
   motor1_speed:
     name: "Motor1 Speed"
@@ -137,19 +152,16 @@ cb19_gate:
   motor2_load:
     name: "Motor2 Load"
 
-  last_state:
-    name: "Last State"
-  last_ack:
-    name: "Last Ack"
-  last_rs:
-    name: "Last RS"
-
   moving:
     name: "Moving"
-  fully_open:
-    name: "Fully Open"
+  fully_opened:
+    name: "Fully Opened"
   fully_closed:
     name: "Fully Closed"
+  ped_opened:
+    name: "Pedestrian Opened"
+  manual_stop:
+    name: "Manual Stop"
   photocell_active:
     name: "Photocell"
   obstruction_active:
