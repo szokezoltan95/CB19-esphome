@@ -1,6 +1,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import uart, cover, sensor, text_sensor, binary_sensor, button, number, select
+from esphome.components import uart, sensor, text_sensor, binary_sensor, button, number, select
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
@@ -11,23 +11,22 @@ from esphome.const import (
     ICON_PERCENT,
 )
 
-AUTO_LOAD = ["cover", "sensor", "text_sensor", "binary_sensor", "button", "number", "select"]
+AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button", "number", "select"]
 DEPENDENCIES = ["uart"]
 
-CONF_COVER = "cover"
 CONF_PEDESTRIAN_BUTTON = "pedestrian_button"
 CONF_MIN_POSITION = "min_position"
 CONF_MAX_POSITION = "max_position"
 CONF_MOTOR1_RAW = "motor1_raw"
 CONF_MOTOR2_RAW = "motor2_raw"
-CONF_MOTOR1_PERCENT = "motor1_percent"
-CONF_MOTOR2_PERCENT = "motor2_percent"
-CONF_OVERALL_PERCENT = "overall_percent"
+CONF_MOTOR1_POSITION = "motor1_position"
+CONF_MOTOR2_POSITION = "motor2_position"
+CONF_GATE_POSITION = "gate_position"
 CONF_MOTOR1_SPEED = "motor1_speed"
 CONF_MOTOR1_LOAD = "motor1_load"
 CONF_MOTOR2_SPEED = "motor2_speed"
 CONF_MOTOR2_LOAD = "motor2_load"
-CONF_LAST_STATE = "last_state"
+CONF_GATE_STATE = "gate_state"
 CONF_LAST_ACK = "last_ack"
 CONF_LAST_RS = "last_rs"
 CONF_LEARN_STATUS = "learn_status"
@@ -35,9 +34,11 @@ CONF_PARAM_CURRENT = "param_current"
 CONF_PARAM_PENDING = "param_pending"
 CONF_CONFIG_WARNING = "config_warning"
 CONF_MOVING = "moving"
-CONF_FULLY_OPEN = "fully_open"
+CONF_FULLY_OPENED = "fully_opened"
 CONF_FULLY_CLOSED = "fully_closed"
 CONF_PHOTOCELL_ACTIVE = "photocell_active"
+CONF_PED_OPENED = "ped_opened"
+CONF_MANUAL_STOP = "manual_stop"
 CONF_OBSTRUCTION_ACTIVE = "obstruction_active"
 CONF_PARAMS_DIRTY = "params_dirty"
 CONF_LEARNING_ACTIVE = "learning_active"
@@ -202,7 +203,6 @@ PARAM_OPTIONS = {
 
 cb19_ns = cg.esphome_ns.namespace("cb19_gate")
 CB19GateComponent = cb19_ns.class_("CB19GateComponent", cg.Component, uart.UARTDevice)
-CB19GateCover = cb19_ns.class_("CB19GateCover", cover.Cover)
 CB19PedestrianButton = cb19_ns.class_("CB19PedestrianButton", button.Button)
 CB19ApplyParametersButton = cb19_ns.class_("CB19ApplyParametersButton", button.Button)
 CB19ReloadParametersButton = cb19_ns.class_("CB19ReloadParametersButton", button.Button)
@@ -220,7 +220,6 @@ schema_dict = {
     cv.Required(CONF_UART_ID): cv.use_id(uart.UARTComponent),
     cv.Optional(CONF_MIN_POSITION, default=1): cv.int_range(min=0, max=255),
     cv.Optional(CONF_MAX_POSITION, default=225): cv.int_range(min=1, max=255),
-    cv.Optional(CONF_COVER): cover.cover_schema(CB19GateCover).extend({cv.Optional(CONF_NAME, default="CB19 Gate"): cv.string}),
     cv.Optional(CONF_PEDESTRIAN_BUTTON): button.button_schema(CB19PedestrianButton).extend({cv.Optional(CONF_NAME, default="Pedestrian Open"): cv.string}),
     cv.Optional(CONF_APPLY_PARAMETERS_BUTTON): button.button_schema(CB19ApplyParametersButton, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default="Apply Parameters"): cv.string}),
     cv.Optional(CONF_RELOAD_PARAMETERS_BUTTON): button.button_schema(CB19ReloadParametersButton, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default="Reload Parameters"): cv.string}),
@@ -233,14 +232,14 @@ schema_dict = {
     cv.Optional(CONF_CLOSING_START_PERCENT): number.number_schema(CB19ClosingStartNumber, unit_of_measurement="%", icon=ICON_PERCENT, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default="Closing Start Percent"): cv.string, cv.Optional("initial_value", default=44.0): cv.float_range(min=1.0, max=100.0), cv.Optional("min_value", default=1.0): cv.float_range(min=0.0, max=100.0), cv.Optional("max_value", default=100.0): cv.float_range(min=1.0, max=100.0), cv.Optional("step", default=1.0): cv.float_range(min=0.1, max=10.0)}),
     cv.Optional(CONF_MOTOR1_RAW): sensor.sensor_schema(accuracy_decimals=0, icon=ICON_COUNTER, entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_MOTOR2_RAW): sensor.sensor_schema(accuracy_decimals=0, icon=ICON_COUNTER, entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
-    cv.Optional(CONF_MOTOR1_PERCENT): sensor.sensor_schema(accuracy_decimals=1, unit_of_measurement="%", icon=ICON_PERCENT),
-    cv.Optional(CONF_MOTOR2_PERCENT): sensor.sensor_schema(accuracy_decimals=1, unit_of_measurement="%", icon=ICON_PERCENT),
-    cv.Optional(CONF_OVERALL_PERCENT): sensor.sensor_schema(accuracy_decimals=1, unit_of_measurement="%", icon=ICON_PERCENT),
+    cv.Optional(CONF_MOTOR1_POSITION): sensor.sensor_schema(accuracy_decimals=1, unit_of_measurement="%", icon=ICON_PERCENT),
+    cv.Optional(CONF_MOTOR2_POSITION): sensor.sensor_schema(accuracy_decimals=1, unit_of_measurement="%", icon=ICON_PERCENT),
+    cv.Optional(CONF_GATE_POSITION): sensor.sensor_schema(accuracy_decimals=1, unit_of_measurement="%", icon=ICON_PERCENT),
     cv.Optional(CONF_MOTOR1_SPEED): sensor.sensor_schema(accuracy_decimals=0, icon=ICON_COUNTER, entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_MOTOR1_LOAD): sensor.sensor_schema(accuracy_decimals=0, icon=ICON_COUNTER, entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_MOTOR2_SPEED): sensor.sensor_schema(accuracy_decimals=0, icon=ICON_COUNTER, entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_MOTOR2_LOAD): sensor.sensor_schema(accuracy_decimals=0, icon=ICON_COUNTER, entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
-    cv.Optional(CONF_LAST_STATE): text_sensor.text_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
+    cv.Optional(CONF_GATE_STATE): text_sensor.text_sensor_schema(),
     cv.Optional(CONF_LAST_ACK): text_sensor.text_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_LAST_RS): text_sensor.text_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_LEARN_STATUS): text_sensor.text_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
@@ -248,8 +247,10 @@ schema_dict = {
     cv.Optional(CONF_PARAM_PENDING): text_sensor.text_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_CONFIG_WARNING): text_sensor.text_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_MOVING): binary_sensor.binary_sensor_schema(),
-    cv.Optional(CONF_FULLY_OPEN): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_FULLY_OPENED): binary_sensor.binary_sensor_schema(),
     cv.Optional(CONF_FULLY_CLOSED): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_PED_OPENED): binary_sensor.binary_sensor_schema(),
+    cv.Optional(CONF_MANUAL_STOP): binary_sensor.binary_sensor_schema(),
     cv.Optional(CONF_PHOTOCELL_ACTIVE): binary_sensor.binary_sensor_schema(),
     cv.Optional(CONF_OBSTRUCTION_ACTIVE): binary_sensor.binary_sensor_schema(),
     cv.Optional(CONF_PARAMS_DIRTY): binary_sensor.binary_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
@@ -266,12 +267,6 @@ async def to_code(config):
     await uart.register_uart_device(var, config)
     cg.add(var.set_position_range(config[CONF_MIN_POSITION], config[CONF_MAX_POSITION]))
 
-    if CONF_COVER in config:
-        conf = config[CONF_COVER]
-        cov = cg.new_Pvariable(conf[CONF_ID])
-        await cover.register_cover(cov, conf)
-        cg.add(cov.set_parent(var))
-        cg.add(var.set_cover(cov))
 
     if CONF_PEDESTRIAN_BUTTON in config:
         conf = config[CONF_PEDESTRIAN_BUTTON]
@@ -325,9 +320,9 @@ async def to_code(config):
     sensor_map = [
         (CONF_MOTOR1_RAW, "set_motor1_raw_sensor"),
         (CONF_MOTOR2_RAW, "set_motor2_raw_sensor"),
-        (CONF_MOTOR1_PERCENT, "set_motor1_percent_sensor"),
-        (CONF_MOTOR2_PERCENT, "set_motor2_percent_sensor"),
-        (CONF_OVERALL_PERCENT, "set_overall_percent_sensor"),
+        (CONF_MOTOR1_POSITION, "set_motor1_position_sensor"),
+        (CONF_MOTOR2_POSITION, "set_motor2_position_sensor"),
+        (CONF_GATE_POSITION, "set_gate_position_sensor"),
         (CONF_MOTOR1_SPEED, "set_motor1_speed_sensor"),
         (CONF_MOTOR1_LOAD, "set_motor1_load_sensor"),
         (CONF_MOTOR2_SPEED, "set_motor2_speed_sensor"),
@@ -339,7 +334,7 @@ async def to_code(config):
             cg.add(getattr(var, setter_name)(sens))
 
     text_map = [
-        (CONF_LAST_STATE, "set_last_state_text_sensor"),
+        (CONF_GATE_STATE, "set_gate_state_text_sensor"),
         (CONF_LAST_ACK, "set_last_ack_text_sensor"),
         (CONF_LAST_RS, "set_last_rs_text_sensor"),
         (CONF_LEARN_STATUS, "set_learn_status_text_sensor"),
@@ -354,8 +349,10 @@ async def to_code(config):
 
     binary_map = [
         (CONF_MOVING, "set_moving_binary_sensor"),
-        (CONF_FULLY_OPEN, "set_fully_open_binary_sensor"),
+        (CONF_FULLY_OPENED, "set_fully_opened_binary_sensor"),
         (CONF_FULLY_CLOSED, "set_fully_closed_binary_sensor"),
+        (CONF_PED_OPENED, "set_ped_opened_binary_sensor"),
+        (CONF_MANUAL_STOP, "set_manual_stop_binary_sensor"),
         (CONF_PHOTOCELL_ACTIVE, "set_photocell_binary_sensor"),
         (CONF_OBSTRUCTION_ACTIVE, "set_obstruction_binary_sensor"),
         (CONF_PARAMS_DIRTY, "set_params_dirty_binary_sensor"),

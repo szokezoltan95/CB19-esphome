@@ -5,7 +5,6 @@
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/button/button.h"
-#include "esphome/components/cover/cover.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/select/select.h"
 #include "esphome/components/sensor/sensor.h"
@@ -26,7 +25,8 @@ enum class GateMotionState : uint8_t {
   CLOSED,
   STOPPED,
   PED_OPENING,
-  PED_OPENED
+  PED_OPENED,
+  AUTO_CLOSING
 };
 
 enum class LearnMode : uint8_t {
@@ -34,17 +34,6 @@ enum class LearnMode : uint8_t {
   AUTO_LEARN,
   REMOTE_LEARN,
   CLEAR_REMOTE
-};
-
-class CB19GateCover : public cover::Cover {
- public:
-  void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
-  cover::CoverTraits get_traits() override;
-  void control(const cover::CoverCall &call) override;
-  void sync_from_parent();
-
- protected:
-  CB19GateComponent *parent_{nullptr};
 };
 
 class CB19PedestrianButton : public button::Button {
@@ -165,7 +154,6 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
     this->max_position_ = max_pos;
   }
 
-  void set_cover(CB19GateCover *cover) { this->cover_ = cover; }
   void set_pedestrian_button(CB19PedestrianButton *button) { this->pedestrian_button_ = button; }
   void set_apply_parameters_button(CB19ApplyParametersButton *button) { this->apply_parameters_button_ = button; }
   void set_reload_parameters_button(CB19ReloadParametersButton *button) { this->reload_parameters_button_ = button; }
@@ -185,15 +173,15 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
 
   void set_motor1_raw_sensor(sensor::Sensor *s) { this->motor1_raw_sensor_ = s; }
   void set_motor2_raw_sensor(sensor::Sensor *s) { this->motor2_raw_sensor_ = s; }
-  void set_motor1_percent_sensor(sensor::Sensor *s) { this->motor1_percent_sensor_ = s; }
-  void set_motor2_percent_sensor(sensor::Sensor *s) { this->motor2_percent_sensor_ = s; }
-  void set_overall_percent_sensor(sensor::Sensor *s) { this->overall_percent_sensor_ = s; }
+  void set_motor1_position_sensor(sensor::Sensor *s) { this->motor1_position_sensor_ = s; }
+  void set_motor2_position_sensor(sensor::Sensor *s) { this->motor2_position_sensor_ = s; }
+  void set_gate_position_sensor(sensor::Sensor *s) { this->gate_position_sensor_ = s; }
   void set_motor1_speed_sensor(sensor::Sensor *s) { this->motor1_speed_sensor_ = s; }
   void set_motor1_load_sensor(sensor::Sensor *s) { this->motor1_load_sensor_ = s; }
   void set_motor2_speed_sensor(sensor::Sensor *s) { this->motor2_speed_sensor_ = s; }
   void set_motor2_load_sensor(sensor::Sensor *s) { this->motor2_load_sensor_ = s; }
 
-  void set_last_state_text_sensor(text_sensor::TextSensor *s) { this->last_state_text_sensor_ = s; }
+  void set_gate_state_text_sensor(text_sensor::TextSensor *s) { this->gate_state_text_sensor_ = s; }
   void set_last_ack_text_sensor(text_sensor::TextSensor *s) { this->last_ack_text_sensor_ = s; }
   void set_last_rs_text_sensor(text_sensor::TextSensor *s) { this->last_rs_text_sensor_ = s; }
   void set_learn_status_text_sensor(text_sensor::TextSensor *s) { this->learn_status_text_sensor_ = s; }
@@ -202,8 +190,10 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void set_config_warning_text_sensor(text_sensor::TextSensor *s) { this->config_warning_text_sensor_ = s; }
 
   void set_moving_binary_sensor(binary_sensor::BinarySensor *s) { this->moving_binary_sensor_ = s; }
-  void set_fully_open_binary_sensor(binary_sensor::BinarySensor *s) { this->fully_open_binary_sensor_ = s; }
+  void set_fully_opened_binary_sensor(binary_sensor::BinarySensor *s) { this->fully_opened_binary_sensor_ = s; }
   void set_fully_closed_binary_sensor(binary_sensor::BinarySensor *s) { this->fully_closed_binary_sensor_ = s; }
+  void set_ped_opened_binary_sensor(binary_sensor::BinarySensor *s) { this->ped_opened_binary_sensor_ = s; }
+  void set_manual_stop_binary_sensor(binary_sensor::BinarySensor *s) { this->manual_stop_binary_sensor_ = s; }
   void set_photocell_binary_sensor(binary_sensor::BinarySensor *s) { this->photocell_binary_sensor_ = s; }
   void set_obstruction_binary_sensor(binary_sensor::BinarySensor *s) { this->obstruction_binary_sensor_ = s; }
   void set_params_dirty_binary_sensor(binary_sensor::BinarySensor *s) { this->params_dirty_binary_sensor_ = s; }
@@ -223,7 +213,7 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void start_clear_remote_learn();
   void set_pending_parameter_from_option(uint8_t index, const std::string &option);
 
-  float get_overall_position_percent() const { return this->overall_percent_; }
+  float get_gate_position_percent() const { return this->gate_position_; }
   GateMotionState get_motion_state() const { return this->motion_state_; }
   float get_opening_start_percent() const { return this->opening_start_percent_; }
   float get_closing_start_percent() const { return this->closing_start_percent_; }
@@ -231,6 +221,9 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void set_closing_start_percent(float value);
 
  protected:
+  void set_stop_command_pending_();
+  void clear_stop_context_();
+  void update_status_flags_();
   void send_command_(const std::string &cmd);
   void parse_line_(const std::string &line);
   bool parse_rs_frame_(const std::string &payload, std::array<uint8_t, 9> &out);
@@ -269,10 +262,10 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   uint8_t max_position_{225};
   uint8_t motor1_raw_{0};
   uint8_t motor2_raw_{0};
-  float motor1_percent_{0.0f};
-  float motor2_percent_{0.0f};
-  float overall_percent_raw_{0.0f};
-  float overall_percent_{0.0f};
+  float motor1_position_{0.0f};
+  float motor2_position_{0.0f};
+  float gate_position_raw_{0.0f};
+  float gate_position_{0.0f};
   uint8_t motor1_speed_{0};
   uint8_t motor1_load_{0};
   uint8_t motor2_speed_{0};
@@ -289,6 +282,9 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   float closing_start_percent_{44.0f};
   bool photocell_active_{false};
   bool obstruction_active_{false};
+  bool manual_stop_{false};
+  bool stop_command_pending_{false};
+  bool stop_ack_received_{false};
   GateMotionState motion_state_{GateMotionState::UNKNOWN};
   std::array<uint8_t, 20> params_current_{};
   std::array<uint8_t, 20> params_pending_{};
@@ -306,7 +302,6 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   uint32_t learn_started_at_{0};
   uint32_t last_learn_poll_time_{0};
 
-  CB19GateCover *cover_{nullptr};
   CB19PedestrianButton *pedestrian_button_{nullptr};
   CB19ApplyParametersButton *apply_parameters_button_{nullptr};
   CB19ReloadParametersButton *reload_parameters_button_{nullptr};
@@ -320,14 +315,14 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   CB19CalibrationNumber *closing_start_number_{nullptr};
   sensor::Sensor *motor1_raw_sensor_{nullptr};
   sensor::Sensor *motor2_raw_sensor_{nullptr};
-  sensor::Sensor *motor1_percent_sensor_{nullptr};
-  sensor::Sensor *motor2_percent_sensor_{nullptr};
-  sensor::Sensor *overall_percent_sensor_{nullptr};
+  sensor::Sensor *motor1_position_sensor_{nullptr};
+  sensor::Sensor *motor2_position_sensor_{nullptr};
+  sensor::Sensor *gate_position_sensor_{nullptr};
   sensor::Sensor *motor1_speed_sensor_{nullptr};
   sensor::Sensor *motor1_load_sensor_{nullptr};
   sensor::Sensor *motor2_speed_sensor_{nullptr};
   sensor::Sensor *motor2_load_sensor_{nullptr};
-  text_sensor::TextSensor *last_state_text_sensor_{nullptr};
+  text_sensor::TextSensor *gate_state_text_sensor_{nullptr};
   text_sensor::TextSensor *last_ack_text_sensor_{nullptr};
   text_sensor::TextSensor *last_rs_text_sensor_{nullptr};
   text_sensor::TextSensor *learn_status_text_sensor_{nullptr};
@@ -335,8 +330,10 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   text_sensor::TextSensor *param_pending_text_sensor_{nullptr};
   text_sensor::TextSensor *config_warning_text_sensor_{nullptr};
   binary_sensor::BinarySensor *moving_binary_sensor_{nullptr};
-  binary_sensor::BinarySensor *fully_open_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *fully_opened_binary_sensor_{nullptr};
   binary_sensor::BinarySensor *fully_closed_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *ped_opened_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *manual_stop_binary_sensor_{nullptr};
   binary_sensor::BinarySensor *photocell_binary_sensor_{nullptr};
   binary_sensor::BinarySensor *obstruction_binary_sensor_{nullptr};
   binary_sensor::BinarySensor *params_dirty_binary_sensor_{nullptr};
