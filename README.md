@@ -4,6 +4,18 @@ Custom ESPHome component for CB19 gate controllers over UART.
 
 This project replaces the original WiFi module with a fully local ESPHome integration and provides full control, diagnostics, and configuration of the gate directly from Home Assistant.
 
+
+
+##Experimental branch
+
+This is the experimental branch for a major refactor of the code with the following:
+- Removal of the cover entity and switch to custom control
+- Corrected gate state handling with all special edge cases
+- All gate states in one state machine
+- Development of custom HACS card integration
+
+
+
 ---
 
 ## Features
