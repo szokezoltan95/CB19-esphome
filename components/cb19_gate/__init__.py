@@ -15,6 +15,9 @@ AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button", "number", "sele
 DEPENDENCIES = ["uart"]
 
 CONF_PEDESTRIAN_BUTTON = "pedestrian_button"
+CONF_OPEN_BUTTON = "open_button"
+CONF_CLOSE_BUTTON = "close_button"
+CONF_STOP_BUTTON = "stop_button"
 CONF_MIN_POSITION = "min_position"
 CONF_MAX_POSITION = "max_position"
 CONF_MOTOR1_RAW = "motor1_raw"
@@ -204,6 +207,9 @@ PARAM_OPTIONS = {
 cb19_ns = cg.esphome_ns.namespace("cb19_gate")
 CB19GateComponent = cb19_ns.class_("CB19GateComponent", cg.Component, uart.UARTDevice)
 CB19PedestrianButton = cb19_ns.class_("CB19PedestrianButton", button.Button)
+CB19OpenButton = cb19_ns.class_("CB19OpenButton", button.Button)
+CB19CloseButton = cb19_ns.class_("CB19CloseButton", button.Button)
+CB19StopButton = cb19_ns.class_("CB19StopButton", button.Button)
 CB19ApplyParametersButton = cb19_ns.class_("CB19ApplyParametersButton", button.Button)
 CB19ReloadParametersButton = cb19_ns.class_("CB19ReloadParametersButton", button.Button)
 CB19RevertParametersButton = cb19_ns.class_("CB19RevertParametersButton", button.Button)
@@ -221,6 +227,9 @@ schema_dict = {
     cv.Optional(CONF_MIN_POSITION, default=1): cv.int_range(min=0, max=255),
     cv.Optional(CONF_MAX_POSITION, default=225): cv.int_range(min=1, max=255),
     cv.Optional(CONF_PEDESTRIAN_BUTTON): button.button_schema(CB19PedestrianButton).extend({cv.Optional(CONF_NAME, default="Pedestrian Open"): cv.string}),
+    cv.Optional(CONF_OPEN_BUTTON): button.button_schema(CB19OpenButton).extend({cv.Optional(CONF_NAME, default="Open"): cv.string}),
+    cv.Optional(CONF_CLOSE_BUTTON): button.button_schema(CB19CloseButton).extend({cv.Optional(CONF_NAME, default="Close"): cv.string}),
+    cv.Optional(CONF_STOP_BUTTON): button.button_schema(CB19StopButton).extend({cv.Optional(CONF_NAME, default="Stop"): cv.string}),
     cv.Optional(CONF_APPLY_PARAMETERS_BUTTON): button.button_schema(CB19ApplyParametersButton, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default="Apply Parameters"): cv.string}),
     cv.Optional(CONF_RELOAD_PARAMETERS_BUTTON): button.button_schema(CB19ReloadParametersButton, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default="Reload Parameters"): cv.string}),
     cv.Optional(CONF_REVERT_PARAMETERS_BUTTON): button.button_schema(CB19RevertParametersButton, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default="Revert Pending Parameters"): cv.string}),
@@ -274,6 +283,19 @@ async def to_code(config):
         await button.register_button(btn, conf)
         cg.add(btn.set_parent(var))
         cg.add(var.set_pedestrian_button(btn))
+
+    control_button_map = [
+        (CONF_OPEN_BUTTON, CB19OpenButton, "set_open_button"),
+        (CONF_CLOSE_BUTTON, CB19CloseButton, "set_close_button"),
+        (CONF_STOP_BUTTON, CB19StopButton, "set_stop_button"),
+    ]
+    for conf_key, cls, setter_name in control_button_map:
+        if conf_key in config:
+            conf = config[conf_key]
+            btn = cg.new_Pvariable(conf[CONF_ID])
+            await button.register_button(btn, conf)
+            cg.add(btn.set_parent(var))
+            cg.add(getattr(var, setter_name)(btn))
 
     button_map = [
         (CONF_APPLY_PARAMETERS_BUTTON, "set_apply_parameters_button"),
