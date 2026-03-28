@@ -45,33 +45,6 @@ class CB19PedestrianButton : public button::Button {
   CB19GateComponent *parent_{nullptr};
 };
 
-class CB19OpenButton : public button::Button {
- public:
-  void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
-
- protected:
-  void press_action() override;
-  CB19GateComponent *parent_{nullptr};
-};
-
-class CB19CloseButton : public button::Button {
- public:
-  void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
-
- protected:
-  void press_action() override;
-  CB19GateComponent *parent_{nullptr};
-};
-
-class CB19StopButton : public button::Button {
- public:
-  void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
-
- protected:
-  void press_action() override;
-  CB19GateComponent *parent_{nullptr};
-};
-
 class CB19ApplyParametersButton : public button::Button {
  public:
   void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
@@ -182,9 +155,6 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   }
 
   void set_pedestrian_button(CB19PedestrianButton *button) { this->pedestrian_button_ = button; }
-  void set_open_button(CB19OpenButton *button) { this->open_button_ = button; }
-  void set_close_button(CB19CloseButton *button) { this->close_button_ = button; }
-  void set_stop_button(CB19StopButton *button) { this->stop_button_ = button; }
   void set_apply_parameters_button(CB19ApplyParametersButton *button) { this->apply_parameters_button_ = button; }
   void set_reload_parameters_button(CB19ReloadParametersButton *button) { this->reload_parameters_button_ = button; }
   void set_revert_parameters_button(CB19RevertParametersButton *button) { this->revert_parameters_button_ = button; }
@@ -273,7 +243,7 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   float scale_position_fallback_(uint8_t raw) const;
   float scale_motor_position_(uint8_t raw, bool closed_valid, uint8_t closed_ref, bool open_valid, uint8_t open_ref) const;
   void recalculate_positions_();
-  float apply_gate_calibration_(float base_percent) const;
+  float apply_cover_calibration_(float base_percent) const;
   void learn_current_refs_from_state_(const std::string &state);
   std::string motion_state_to_string_(GateMotionState state) const;
   bool is_moving_state_(GateMotionState state) const;
@@ -333,9 +303,6 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   uint32_t last_learn_poll_time_{0};
 
   CB19PedestrianButton *pedestrian_button_{nullptr};
-  CB19OpenButton *open_button_{nullptr};
-  CB19CloseButton *close_button_{nullptr};
-  CB19StopButton *stop_button_{nullptr};
   CB19ApplyParametersButton *apply_parameters_button_{nullptr};
   CB19ReloadParametersButton *reload_parameters_button_{nullptr};
   CB19RevertParametersButton *revert_parameters_button_{nullptr};

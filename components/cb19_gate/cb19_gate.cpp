@@ -45,24 +45,6 @@ void CB19PedestrianButton::press_action() {
   }
 }
 
-void CB19OpenButton::press_action() {
-  if (this->parent_ != nullptr) {
-    this->parent_->open_gate();
-  }
-}
-
-void CB19CloseButton::press_action() {
-  if (this->parent_ != nullptr) {
-    this->parent_->close_gate();
-  }
-}
-
-void CB19StopButton::press_action() {
-  if (this->parent_ != nullptr) {
-    this->parent_->stop_gate();
-  }
-}
-
 void CB19ApplyParametersButton::press_action() {
   if (this->parent_ != nullptr) {
     this->parent_->apply_pending_parameters();
@@ -452,7 +434,7 @@ float CB19GateComponent::scale_motor_position_(uint8_t raw, bool closed_valid, u
   return std::max(0.0f, std::min(100.0f, value));
 }
 
-float CB19GateComponent::apply_gate_calibration_(float base_percent) const {
+float CB19GateComponent::apply_cover_calibration_(float base_percent) const {
   float value = base_percent;
   if (this->motion_state_ == GateMotionState::OPENING || this->motion_state_ == GateMotionState::PED_OPENING) {
     if (this->opening_start_percent_ < 99.0f) {
@@ -474,7 +456,7 @@ void CB19GateComponent::recalculate_positions_() {
   } else {
     this->gate_position_raw_ = (this->motor1_position_ + this->motor2_position_) / 2.0f;
   }
-  this->gate_position_ = this->apply_gate_calibration_(this->gate_position_raw_);
+  this->gate_position_ = this->apply_cover_calibration_(this->gate_position_raw_);
 }
 
 void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, const std::string &raw_line) {
@@ -566,8 +548,8 @@ void CB19GateComponent::apply_state_line_(const std::string &line) {
     this->obstruction_active_ = false;
     this->manual_stop_ = false;
     this->set_motion_state_(GateMotionState::OPENED);
-    this->gate_position_raw_ = this->motor1_position_;
-    this->gate_position_ = this->motor1_position_;
+    this->gate_position_raw_ = 100.0f;
+    this->gate_position_ = 100.0f;
   } else if (state == "Closing") {
     this->clear_stop_context_();
     this->obstruction_active_ = false;
@@ -601,8 +583,8 @@ void CB19GateComponent::apply_state_line_(const std::string &line) {
     this->obstruction_active_ = false;
     this->manual_stop_ = false;
     this->set_motion_state_(GateMotionState::PED_OPENED);
-    this->gate_position_raw_ = this->motor1_position_;
-    this->gate_position_ = this->motor1_position_;
+    this->gate_position_raw_ = 100.0f;
+    this->gate_position_ = 100.0f;
   }
 
   this->recalculate_positions_();
@@ -702,7 +684,7 @@ void CB19GateComponent::clear_stop_context_() {
 }
 
 void CB19GateComponent::update_status_flags_() {
-  this->gate_position_ = this->apply_gate_calibration_(this->gate_position_raw_);
+  this->gate_position_ = this->apply_cover_calibration_(this->gate_position_raw_);
 }
 
 uint32_t CB19GateComponent::get_poll_interval_ms_() const {
