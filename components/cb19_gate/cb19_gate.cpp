@@ -467,14 +467,24 @@ float CB19GateComponent::apply_gate_calibration_(float base_percent) const {
 }
 
 void CB19GateComponent::recalculate_positions_() {
-  this->motor1_position_ = this->scale_motor_position_(this->motor1_raw_, this->motor1_closed_ref_valid_, this->motor1_closed_ref_, this->motor1_open_ref_valid_, this->motor1_open_ref_);
-  this->motor2_position_ = this->scale_motor_position_(this->motor2_raw_, this->motor2_closed_ref_valid_, this->motor2_closed_ref_, this->motor2_open_ref_valid_, this->motor2_open_ref_);
+  const float motor1_base = this->scale_motor_position_(
+      this->motor1_raw_, this->motor1_closed_ref_valid_, this->motor1_closed_ref_,
+      this->motor1_open_ref_valid_, this->motor1_open_ref_);
+
+  const float motor2_base = this->scale_motor_position_(
+      this->motor2_raw_, this->motor2_closed_ref_valid_, this->motor2_closed_ref_,
+      this->motor2_open_ref_valid_, this->motor2_open_ref_);
+
+  this->motor1_position_ = this->apply_gate_calibration_(motor1_base);
+  this->motor2_position_ = this->apply_gate_calibration_(motor2_base);
+
   if (this->motion_state_ == GateMotionState::PED_OPENING || this->motion_state_ == GateMotionState::PED_OPENED) {
     this->gate_position_raw_ = this->motor1_position_;
+    this->gate_position_ = this->motor1_position_;
   } else {
     this->gate_position_raw_ = (this->motor1_position_ + this->motor2_position_) / 2.0f;
+    this->gate_position_ = (this->motor1_position_ + this->motor2_position_) / 2.0f;
   }
-  this->gate_position_ = this->apply_gate_calibration_(this->gate_position_raw_);
 }
 
 void CB19GateComponent::apply_rs_frame_(const std::array<uint8_t, 9> &frame, const std::string &raw_line) {
@@ -660,7 +670,6 @@ void CB19GateComponent::publish_all_() {
   if (this->photocell_binary_sensor_ != nullptr) this->photocell_binary_sensor_->publish_state(this->photocell_active_);
   if (this->obstruction_binary_sensor_ != nullptr) this->obstruction_binary_sensor_->publish_state(this->obstruction_active_);
   if (this->params_dirty_binary_sensor_ != nullptr) this->params_dirty_binary_sensor_->publish_state(this->params_dirty_);
-
 }
 
 std::string CB19GateComponent::motion_state_to_string_(GateMotionState state) const {
@@ -688,7 +697,6 @@ void CB19GateComponent::set_motion_state_(GateMotionState state) {
   }
 }
 
-
 void CB19GateComponent::set_stop_command_pending_() {
   this->stop_command_pending_ = true;
   this->stop_ack_received_ = false;
@@ -702,7 +710,13 @@ void CB19GateComponent::clear_stop_context_() {
 }
 
 void CB19GateComponent::update_status_flags_() {
-  this->gate_position_ = this->apply_gate_calibration_(this->gate_position_raw_);
+  if (this->motion_state_ == GateMotionState::PED_OPENING || this->motion_state_ == GateMotionState::PED_OPENED) {
+    this->gate_position_raw_ = this->motor1_position_;
+    this->gate_position_ = this->motor1_position_;
+  } else {
+    this->gate_position_raw_ = (this->motor1_position_ + this->motor2_position_) / 2.0f;
+    this->gate_position_ = (this->motor1_position_ + this->motor2_position_) / 2.0f;
+  }
 }
 
 uint32_t CB19GateComponent::get_poll_interval_ms_() const {
