@@ -270,20 +270,6 @@ Recommended when you want:
 
 ---
 
-## Branches and Releases
-
-The active stable branch is now `main`.
-
-Recommended release flow:
-
-1. develop changes on a feature or experimental branch
-2. test on hardware
-3. merge into `main`
-4. create a GitHub release/tag
-5. update example YAML and README if needed
-
----
-
 ## License
 
 See `LICENSE`.
