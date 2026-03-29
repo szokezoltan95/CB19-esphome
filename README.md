@@ -3,7 +3,7 @@
 [![ESPHome](https://img.shields.io/badge/ESPHome-external_component-000000?logo=esphome)](https://esphome.io/components/external_components/)
 [![GitHub Release](https://img.shields.io/github/v/release/szokezoltan95/CB19-esphome?display_name=tag)](https://github.com/szokezoltan95/CB19-esphome/releases)
 [![GitHub Downloads](https://img.shields.io/github/downloads/szokezoltan95/CB19-esphome/total)](https://github.com/szokezoltan95/CB19-esphome/releases)
-[![License](https://img.shields.io/github/license/szokezoltan95/CB19-esphome)](https://github.com/szokezoltan95/CB19-esphome/blob/main/LICENSE)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 Custom ESPHome component for CB19 gate controllers over UART.
 
