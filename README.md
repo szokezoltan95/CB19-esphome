@@ -119,7 +119,7 @@ Optionally, it is possible to install it on the TMT factory WiFi module.
 1. A 3,3V FTDI programming board is needed
 2. Solder the wires to the exposed UART pads on the back side of the PCB
 3. While powering up, hold down the **P** button to enter bootloader mode
-4. Optional -- Use `esptool` to make a backup of the factory firmware:
+4. Optional: Use `esptool` to make a backup of the factory firmware:
 	
 	```esptool --chip esp32 --port <portnr> read-flash 0 0x1000000 backup.bin```
 
