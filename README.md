@@ -113,7 +113,7 @@ Notes:
 
 Optionally it is possible to install it on the TMT factory WiFi module.
 
-![Factory module wiring](docs/factory_module.jpg)
+<img src="docs/factory_module.jpg" width="50%">
 
 1. A 3,3V FTDI programming board is needed
 2. Solder the wires to the exposed UART pads on the back side of the PCB
