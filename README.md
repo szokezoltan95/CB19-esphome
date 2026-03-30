@@ -95,10 +95,10 @@ Example divider:
 
 ```text
 Gate TX ---[10k]---+--- ESP RX
-                  |
-                [18k]
-                  |
-                 GND
+                   |
+                 [18k]
+                   |
+                  GND
 ```
 
 Notes:
@@ -107,6 +107,32 @@ Notes:
 - ESP TX → Gate RX usually works directly
 - Keep wiring short and clean
 - Stable grounding matters a lot for reliable UART communication
+
+
+### Factory TMT WiFi module
+
+Optionally it is possible to install it on the TMT factory WiFi module.
+
+![Factory module wiring](docs/factory_module.jpg)
+
+1. A 3,3V FTDI programming board is needed
+2. Solder the wires to the exposed UART pads on the back side of the PCB
+3. While powering up, hold down the **P** button to enter bootloader mode
+4. Optional - Use `esptool` to make a backup of the factory firmware:
+	```esptool --chip esp32 --port <portnr> read-flash 0 0x1000000 backup.bin```
+5. Upload the esphome firmware as usual
+
+Notes:
+- The factory WiFi module uses the same UART pins as in the example yaml, so nothing needs to be changed
+- Optionally, to ensure working OTA updates in the future, set the size of the flash memory to 16 MB:
+
+```yaml
+esp32:
+  board: esp32dev
+  flash_size: 16MB
+  framework:
+    type: arduino
+```
 
 ---
 
