@@ -108,10 +108,11 @@ Notes:
 - Keep wiring short and clean
 - Stable grounding matters a lot for reliable UART communication
 
+---
 
 ### Factory TMT WiFi module
 
-Optionally it is possible to install it on the TMT factory WiFi module.
+Optionally, it is possible to install it on the TMT factory WiFi module.
 
 <img src="docs/factory_module.jpg" width="50%">
 
