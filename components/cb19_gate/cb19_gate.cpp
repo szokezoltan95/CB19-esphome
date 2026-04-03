@@ -535,9 +535,6 @@ void CB19GateComponent::learn_current_refs_from_state_(const std::string &state)
     this->motor2_open_ref_ = this->motor2_raw_;
     this->motor1_open_ref_valid_ = true;
     this->motor2_open_ref_valid_ = true;
-  } else if (state == "PedOpened") {
-    this->motor1_open_ref_ = this->motor1_raw_;
-    this->motor1_open_ref_valid_ = true;
   }
 }
 
