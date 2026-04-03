@@ -544,18 +544,29 @@ void CB19GateComponent::learn_current_refs_from_state_(const std::string &state)
 void CB19GateComponent::apply_state_line_(const std::string &line) {
   const std::string state = this->extract_protocol_state_(line);
 
-  if (state != "Opening" &&
-      state != "Opened" &&
-      state != "Closing" &&
-      state != "Closed" &&
-      state != "Stopped" &&
-      state != "PedOpening" &&
-      state != "PedOpened" &&
-      state != "AutoClosing") {
+  const bool is_gate_state =
+      state == "Opening" ||
+      state == "Opened" ||
+      state == "Closing" ||
+      state == "Closed" ||
+      state == "Stopped" ||
+      state == "PedOpening" ||
+      state == "PedOpened" ||
+      state == "AutoClosing";
 
+  const bool is_internal_event =
+      state == "Restored" ||
+      state == "AutoLearn" ||
+      state == "LearnStart" ||
+      state == "RemoteAdd" ||
+      state == "LearnComplete" ||
+      state == "ClearComplete";
+
+  if (!is_gate_state && !is_internal_event) {
     ESP_LOGD(TAG, "Ignoring non-state V1PKF line: %s", line.c_str());
     return;
   }
+
   this->last_state_line_ = state;
 
   if (state == "Restored") {
@@ -631,9 +642,10 @@ void CB19GateComponent::apply_state_line_(const std::string &line) {
   this->recalculate_positions_();
   this->update_status_flags_();
 
-  if (this->gate_state_text_sensor_ != nullptr) {
+  if (is_gate_state && this->gate_state_text_sensor_ != nullptr) {
     this->gate_state_text_sensor_->publish_state(state);
   }
+
   this->publish_all_();
 }
 
