@@ -557,7 +557,6 @@ void CB19GateComponent::apply_state_line_(const std::string &line) {
     return;
   }
   this->last_state_line_ = state;
-}
 
   if (state == "Restored") {
     this->request_param_read();
