@@ -543,7 +543,21 @@ void CB19GateComponent::learn_current_refs_from_state_(const std::string &state)
 
 void CB19GateComponent::apply_state_line_(const std::string &line) {
   const std::string state = this->extract_protocol_state_(line);
+
+  if (state != "Opening" &&
+      state != "Opened" &&
+      state != "Closing" &&
+      state != "Closed" &&
+      state != "Stopped" &&
+      state != "PedOpening" &&
+      state != "PedOpened" &&
+      state != "AutoClosing") {
+
+    ESP_LOGD(TAG, "Ignoring non-state V1PKF line: %s", line.c_str());
+    return;
+  }
   this->last_state_line_ = state;
+}
 
   if (state == "Restored") {
     this->request_param_read();
