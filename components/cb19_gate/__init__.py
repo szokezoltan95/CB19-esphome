@@ -1,15 +1,19 @@
+from esphome import pins
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import uart, sensor, text_sensor, binary_sensor, button, number, select
 from esphome.const import (
     CONF_ID,
     CONF_NAME,
+    CONF_PIN,
     CONF_UART_ID,
     ENTITY_CATEGORY_CONFIG,
     ENTITY_CATEGORY_DIAGNOSTIC,
     ICON_COUNTER,
     ICON_PERCENT,
 )
+from esphome.cpp_helpers import gpio_pin_expression
+
 
 AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button", "number", "select"]
 DEPENDENCIES = ["uart"]
@@ -47,6 +51,9 @@ CONF_PARAMS_DIRTY = "params_dirty"
 CONF_LEARNING_ACTIVE = "learning_active"
 CONF_OPENING_START_PERCENT = "opening_start_percent"
 CONF_CLOSING_START_PERCENT = "closing_start_percent"
+CONF_POWER_SAVE = "power_save"
+CONF_POWER_RELAY_PIN = "power_relay_pin"
+CONF_POWER_SAVE_ACTIVE = "power_save_active"
 CONF_APPLY_PARAMETERS_BUTTON = "apply_parameters_button"
 CONF_RELOAD_PARAMETERS_BUTTON = "reload_parameters_button"
 CONF_REVERT_PARAMETERS_BUTTON = "revert_parameters_button"
@@ -264,6 +271,9 @@ schema_dict = {
     cv.Optional(CONF_OBSTRUCTION_ACTIVE): binary_sensor.binary_sensor_schema(),
     cv.Optional(CONF_PARAMS_DIRTY): binary_sensor.binary_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
     cv.Optional(CONF_LEARNING_ACTIVE): binary_sensor.binary_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
+    cv.Optional(CONF_POWER_SAVE): cv.boolean,
+    cv.Optional(CONF_POWER_RELAY_PIN): pins.gpio_output_pin_schema,
+    cv.Optional(CONF_POWER_SAVE_ACTIVE): binary_sensor.binary_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC),
 }
 for key in PARAM_KEYS:
     schema_dict[cv.Optional(key)] = select.select_schema(CB19ParameterSelect, entity_category=ENTITY_CATEGORY_CONFIG).extend({cv.Optional(CONF_NAME, default=key.upper()): cv.string})
@@ -330,6 +340,11 @@ async def to_code(config):
         cg.add(num.set_initial_value(conf["initial_value"]))
         cg.add(var.set_closing_start_number(num))
 
+    cg.add(var.set_power_save(config[CONF_POWER_SAVE]))
+    if CONF_POWER_RELAY_PIN in config:
+        pin = await gpio_pin_expression(config[CONF_POWER_RELAY_PIN])
+        cg.add(var.set_power_relay_pin(pin))
+
     for idx, key in enumerate(PARAM_KEYS):
         if key in config:
             conf = config[key]
@@ -379,6 +394,7 @@ async def to_code(config):
         (CONF_OBSTRUCTION_ACTIVE, "set_obstruction_binary_sensor"),
         (CONF_PARAMS_DIRTY, "set_params_dirty_binary_sensor"),
         (CONF_LEARNING_ACTIVE, "set_learning_active_binary_sensor"),
+        (CONF_POWER_SAVE_ACTIVE, "set_power_save_active_binary_sensor"),
     ]
     for conf_key, setter_name in binary_map:
         if conf_key in config:

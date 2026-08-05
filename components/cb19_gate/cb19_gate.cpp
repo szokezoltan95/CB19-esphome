@@ -130,6 +130,9 @@ void CB19GateComponent::setup() {
   this->last_motion_change_time_ = now;
   this->suppress_poll_until_ = now + 1000;
 
+  this->power_saver_ = new CB19PowerSaver(this->power_relay_pin_, this->power_save_active_binary_sensor_);
+  this->power_saver_->set_power_save_enabled(this->power_save_enabled_temp_);
+
   if (this->opening_start_number_ != nullptr) {
     this->opening_start_percent_ = this->opening_start_number_->get_initial_value();
     this->opening_start_number_->publish_state(this->opening_start_percent_);
@@ -140,6 +143,12 @@ void CB19GateComponent::setup() {
   }
 
   this->set_learn_status_("Idle", false);
+
+  if (this->power_saver_->is_enabled()) {
+    // Possibly control box is starting up with the ESP32, assuming control box is not in power save mode (internal power save after 3 minutes inactivity)
+    this->power_saver_->exit_power_save();
+    this->last_poll_time_ = millis();
+  }
 }
 
 void CB19GateComponent::dump_config() {
@@ -153,6 +162,10 @@ void CB19GateComponent::dump_config() {
 void CB19GateComponent::loop() {
   while (this->available()) {
     const char c = static_cast<char>(this->read());
+    if (this->power_saver_->is_active()) {
+      this->power_saver_->exit_power_save();
+      this->last_poll_time_ = millis();
+    }
     if (c == '\n' || c == '\r') {
       if (!this->buffer_.empty()) {
         const std::string line = trim_copy(this->buffer_);
@@ -166,6 +179,26 @@ void CB19GateComponent::loop() {
       if (this->buffer_.size() > 256) {
         ESP_LOGW(TAG, "RX buffer overflow, dropping line");
         this->buffer_.clear();
+      }
+    }
+  }
+
+  if (this->power_saver_->is_enabled()) {
+    if (this->power_saver_->is_active()) {
+      if (this->is_moving_state_(this->motion_state_) || this->learn_mode_ == LearnMode::AUTO_LEARN) {
+        this->power_saver_->exit_power_save();
+        this->last_poll_time_ = millis();
+      } else {
+        return;
+      }
+    } else {
+      if (this->is_moving_state_(this->motion_state_) || this->learn_mode_ == LearnMode::AUTO_LEARN) {
+        this->power_saver_->update_last_activity_time();
+      } else {
+        if (this->power_saver_->is_inactivity_elapsed()) {
+          this->power_saver_->enter_power_save();
+          return;
+        }
       }
     }
   }
@@ -239,6 +272,10 @@ void CB19GateComponent::start_clear_remote_learn() {
 }
 
 void CB19GateComponent::send_command_(const std::string &cmd) {
+  if (this->power_saver_->is_active()) {
+    this->power_saver_->exit_power_save();
+    this->last_poll_time_ = millis();
+  }
   const std::string full = cmd + ";src=P0031DA2\r\n";
   ESP_LOGI(TAG, "TX RAW: [%s]", full.c_str());
   this->write_str(full.c_str());
@@ -785,6 +822,30 @@ void CB19GateComponent::maybe_poll_learn_status_() {
     this->last_learn_poll_time_ = now;
     this->send_command_("READ LEARN STATUS");
   }
+}
+
+bool CB19GateComponent::is_inactivity_elapsed() {
+  return millis() - this->last_activity_time_ > this->power_save_timeout_ms_;
+}
+
+void CB19GateComponent::enter_power_save() {
+  this->power_relay_pin_->digital_write(false);
+  this->power_save_active_ = true;
+  if (this->power_save_active_binary_sensor_ != nullptr) {
+    this->power_save_active_binary_sensor_->publish_state(true);
+  }
+  ESP_LOGI(TAG, "Power save is active: power relay OFF");
+}
+
+void CB19GateComponent::exit_power_save() {
+  this->power_relay_pin_->digital_write(true);
+  this->power_save_active_ = false;
+  const uint32_t now = millis();
+  this->last_activity_time_ = now;
+  if (this->power_save_active_binary_sensor_ != nullptr) {
+    this->power_save_active_binary_sensor_->publish_state(false);
+  }
+  ESP_LOGI(TAG, "Power save is inactive: power relay ON");
 }
 
 }  // namespace cb19_gate
