@@ -40,6 +40,7 @@ uart:
 cb19_gate:
   id: gate_controller
   uart_id: gate_uart
+  power_save: true
 
   pedestrian_button:
     name: "Pedestrian Open"
@@ -165,3 +166,5 @@ cb19_gate:
     name: "Photocell"
   obstruction_active:
     name: "Obstruction"
+  power_save_active:
+    name: "Power Save Active"

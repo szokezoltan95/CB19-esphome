@@ -16,6 +16,7 @@ namespace esphome {
 namespace cb19_gate {
 
 class CB19GateComponent;
+class CB19PowerSaver;
 
 enum class GateMotionState : uint8_t {
   UNKNOWN = 0,
@@ -34,6 +35,19 @@ enum class LearnMode : uint8_t {
   AUTO_LEARN,
   REMOTE_LEARN,
   CLEAR_REMOTE
+};
+
+enum class PendingMotionRequest : uint8_t {
+  NONE = 0,
+  OPEN,
+  CLOSE,
+  PED_OPEN
+};
+
+enum class PendingMotionState : uint8_t {
+  NO_COMMAND_SENT = 0,
+  REVERSE_COMMAND_SENT,
+  ORIGINAL_COMMAND_SENT,
 };
 
 class CB19PedestrianButton : public button::Button {
@@ -168,6 +182,34 @@ class CB19ClosingStartNumber : public CB19CalibrationNumber {
   void control(float value) override;
 };
 
+class CB19PowerSaver {
+ public:
+  CB19PowerSaver(GPIOPin *power_relay_pin, binary_sensor::BinarySensor *power_save_active_binary_sensor)
+      : power_relay_pin_(power_relay_pin), power_save_active_binary_sensor_(power_save_active_binary_sensor) {}
+
+  void set_power_save_enabled(bool enabled) { this->power_save_enabled_ = enabled; }
+  void set_timeout_ms(uint32_t timeout) { this->power_save_timeout_ms_ = timeout; }
+  void set_wake_delay_ms(uint32_t delay) { this->power_save_wake_delay_ms_ = delay; }
+
+  bool is_enabled() const { return this->power_save_enabled_; }
+  bool is_active() const { return this->power_save_active_; }
+  uint32_t get_last_activity_time() const { return this->last_activity_time_; }
+  void update_last_activity_time() { this->last_activity_time_ = millis(); }
+
+  bool is_inactivity_elapsed();
+  void enter_power_save();
+  void exit_power_save();
+
+ private:
+  bool power_save_enabled_{false};
+  bool power_save_active_{false};
+  uint32_t last_activity_time_{0};
+  uint32_t power_save_timeout_ms_{60000};
+  uint32_t power_save_wake_delay_ms_{500};
+  GPIOPin *power_relay_pin_;
+  binary_sensor::BinarySensor *power_save_active_binary_sensor_;
+};
+
 class CB19GateComponent : public Component, public uart::UARTDevice {
  public:
   explicit CB19GateComponent(uart::UARTComponent *parent) : uart::UARTDevice(parent) {}
@@ -200,6 +242,10 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
 
   void set_opening_start_number(CB19CalibrationNumber *n) { this->opening_start_number_ = n; }
   void set_closing_start_number(CB19CalibrationNumber *n) { this->closing_start_number_ = n; }
+
+  void set_power_save(bool power_save_enabled) { this->power_save_enabled_temp_ = power_save_enabled; }
+  void set_power_relay_pin(GPIOPin *power_relay_pin) { this->power_relay_pin_ = power_relay_pin; }
+  void set_power_save_active_binary_sensor(binary_sensor::BinarySensor *s) { this->power_save_active_binary_sensor_ = s; }
 
   void set_motor1_raw_sensor(sensor::Sensor *s) { this->motor1_raw_sensor_ = s; }
   void set_motor2_raw_sensor(sensor::Sensor *s) { this->motor2_raw_sensor_ = s; }
@@ -284,6 +330,7 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void maybe_poll_learn_status_();
   void handle_learn_status_ack_(const std::string &payload);
   void set_learn_status_(const std::string &status, bool active);
+  void check_motion_state_workaround_();
 
   std::string buffer_;
   bool has_frame_{false};
@@ -331,6 +378,12 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   bool learn_polling_active_{false};
   uint32_t learn_started_at_{0};
   uint32_t last_learn_poll_time_{0};
+  bool power_save_enabled_temp_{false};
+  
+  // Motion state workaround members
+  PendingMotionRequest pending_motion_request_{PendingMotionRequest::NONE};
+  PendingMotionState pending_motion_state_{PendingMotionState::NO_COMMAND_SENT};
+  uint32_t pending_motion_request_time_{0};
 
   CB19PedestrianButton *pedestrian_button_{nullptr};
   CB19OpenButton *open_button_{nullptr};
@@ -371,6 +424,9 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   binary_sensor::BinarySensor *obstruction_binary_sensor_{nullptr};
   binary_sensor::BinarySensor *params_dirty_binary_sensor_{nullptr};
   binary_sensor::BinarySensor *learning_active_binary_sensor_{nullptr};
+  binary_sensor::BinarySensor *power_save_active_binary_sensor_{nullptr};
+  GPIOPin *power_relay_pin_;
+  CB19PowerSaver *power_saver_{nullptr};
 };
 
 }  // namespace cb19_gate

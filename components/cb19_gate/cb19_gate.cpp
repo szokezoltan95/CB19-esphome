@@ -130,6 +130,9 @@ void CB19GateComponent::setup() {
   this->last_motion_change_time_ = now;
   this->suppress_poll_until_ = now + 1000;
 
+  this->power_saver_ = new CB19PowerSaver(this->power_relay_pin_, this->power_save_active_binary_sensor_);
+  this->power_saver_->set_power_save_enabled(this->power_save_enabled_temp_);
+
   if (this->opening_start_number_ != nullptr) {
     this->opening_start_percent_ = this->opening_start_number_->get_initial_value();
     this->opening_start_number_->publish_state(this->opening_start_percent_);
@@ -140,6 +143,12 @@ void CB19GateComponent::setup() {
   }
 
   this->set_learn_status_("Idle", false);
+
+  if (this->power_saver_->is_enabled()) {
+    // Possibly control box is starting up with the ESP32, assuming control box is not in power save mode (internal power save after 3 minutes inactivity)
+    this->power_saver_->exit_power_save();
+    this->last_poll_time_ = millis();
+  }
 }
 
 void CB19GateComponent::dump_config() {
@@ -153,6 +162,10 @@ void CB19GateComponent::dump_config() {
 void CB19GateComponent::loop() {
   while (this->available()) {
     const char c = static_cast<char>(this->read());
+    if (this->power_saver_->is_active()) {
+      this->power_saver_->exit_power_save();
+      this->last_poll_time_ = millis();
+    }
     if (c == '\n' || c == '\r') {
       if (!this->buffer_.empty()) {
         const std::string line = trim_copy(this->buffer_);
@@ -170,6 +183,27 @@ void CB19GateComponent::loop() {
     }
   }
 
+  if (this->power_saver_->is_enabled()) {
+    if (this->power_saver_->is_active()) {
+      if (this->is_moving_state_(this->motion_state_) || this->learn_mode_ == LearnMode::AUTO_LEARN) {
+        this->power_saver_->exit_power_save();
+        this->last_poll_time_ = millis();
+      } else {
+        return;
+      }
+    } else {
+      if (this->is_moving_state_(this->motion_state_) || this->learn_mode_ == LearnMode::AUTO_LEARN) {
+        this->power_saver_->update_last_activity_time();
+      } else {
+        if (this->power_saver_->is_inactivity_elapsed()) {
+          this->power_saver_->enter_power_save();
+          return;
+        }
+      }
+    }
+  }
+
+  this->check_motion_state_workaround_();
   this->maybe_poll_rs_();
   this->maybe_sync_parameters_();
   this->maybe_poll_learn_status_();
@@ -177,10 +211,16 @@ void CB19GateComponent::loop() {
 
 void CB19GateComponent::open_gate() {
   this->clear_stop_context_();
+  this->pending_motion_request_ = PendingMotionRequest::OPEN;
+  this->pending_motion_state_ = PendingMotionState::NO_COMMAND_SENT;
+  this->pending_motion_request_time_ = millis();
   this->send_command_("FULL OPEN");
 }
 void CB19GateComponent::close_gate() {
   this->clear_stop_context_();
+  this->pending_motion_request_ = PendingMotionRequest::CLOSE;
+  this->pending_motion_state_ = PendingMotionState::NO_COMMAND_SENT;
+  this->pending_motion_request_time_ = millis();
   this->send_command_("FULL CLOSE");
 }
 void CB19GateComponent::stop_gate() {
@@ -189,6 +229,9 @@ void CB19GateComponent::stop_gate() {
 }
 void CB19GateComponent::pedestrian_open() {
   this->clear_stop_context_();
+  this->pending_motion_request_ = PendingMotionRequest::PED_OPEN;
+  this->pending_motion_state_ = PendingMotionState::NO_COMMAND_SENT;
+  this->pending_motion_request_time_ = millis();
   this->send_command_("PED OPEN");
 }
 void CB19GateComponent::request_param_read() { this->send_command_("RP,1"); }
@@ -239,6 +282,10 @@ void CB19GateComponent::start_clear_remote_learn() {
 }
 
 void CB19GateComponent::send_command_(const std::string &cmd) {
+  if (this->power_saver_->is_active()) {
+    this->power_saver_->exit_power_save();
+    this->last_poll_time_ = millis();
+  }
   const std::string full = cmd + ";src=P0031DA2\r\n";
   ESP_LOGI(TAG, "TX RAW: [%s]", full.c_str());
   this->write_str(full.c_str());
@@ -785,6 +832,118 @@ void CB19GateComponent::maybe_poll_learn_status_() {
     this->last_learn_poll_time_ = now;
     this->send_command_("READ LEARN STATUS");
   }
+}
+
+bool CB19PowerSaver::is_inactivity_elapsed() {
+  return millis() - this->last_activity_time_ > this->power_save_timeout_ms_;
+}
+
+void CB19PowerSaver::enter_power_save() {
+  this->power_relay_pin_->digital_write(false);
+  this->power_save_active_ = true;
+  if (this->power_save_active_binary_sensor_ != nullptr) {
+    this->power_save_active_binary_sensor_->publish_state(true);
+  }
+  ESP_LOGI(TAG, "Power save is active: power relay OFF");
+}
+
+void CB19PowerSaver::exit_power_save() {
+  this->power_relay_pin_->digital_write(true);
+  this->power_save_active_ = false;
+  const uint32_t now = millis();
+  this->last_activity_time_ = now;
+  if (this->power_save_active_binary_sensor_ != nullptr) {
+    this->power_save_active_binary_sensor_->publish_state(false);
+  }
+  ESP_LOGI(TAG, "Power save is inactive: power relay ON");
+}
+
+void CB19GateComponent::check_motion_state_workaround_() {
+  if (this->pending_motion_request_ == PendingMotionRequest::NONE) {
+    return;
+  }
+
+  // Check if motion state has changed appropriately
+  bool is_motion_correct = false;
+  PendingMotionRequest request = this->pending_motion_request_;
+
+  switch (request) {
+    case PendingMotionRequest::OPEN:
+      if (this->motion_state_ == GateMotionState::OPENING) {
+        is_motion_correct = true;
+      }
+      break;
+    case PendingMotionRequest::CLOSE:
+      if (this->motion_state_ == GateMotionState::CLOSING) {
+        is_motion_correct = true;
+      }
+      break;
+    case PendingMotionRequest::PED_OPEN:
+      if (this->motion_state_ == GateMotionState::PED_OPENING) {
+        is_motion_correct = true;
+      }
+      break;
+    default:
+      break;
+  }
+
+  if (is_motion_correct) {
+    ESP_LOGW(TAG, "Motion is now correct, clear the pending request");
+    this->pending_motion_request_ = PendingMotionRequest::NONE;
+    this->pending_motion_state_ = PendingMotionState::NO_COMMAND_SENT;
+    return;
+  }
+
+  const uint32_t pending_motion_requested_since = millis() - this->pending_motion_request_time_;
+  if (pending_motion_requested_since < 1000UL) {
+    // Waiting for correct motion to be received from gate after request
+    return;
+  }
+
+  if (this->pending_motion_state_ == PendingMotionState::NO_COMMAND_SENT) {
+    ESP_LOGW(TAG, "Correct motion haven't received, reverse command for pending request");
+    switch (request) {
+      case PendingMotionRequest::OPEN:
+        this->send_command_("FULL CLOSE");
+        break;
+      case PendingMotionRequest::CLOSE:
+        this->send_command_("FULL OPEN");
+        break;
+      case PendingMotionRequest::PED_OPEN:
+        this->send_command_("FULL CLOSE");
+        break;
+      default:
+        break;
+    }
+    this->pending_motion_state_ = PendingMotionState::REVERSE_COMMAND_SENT;
+    return;
+  }
+
+  if (pending_motion_requested_since < 2500UL) {
+    // Waiting after reverse command is sent
+    return;
+  }
+
+  if (this->pending_motion_state_ == PendingMotionState::REVERSE_COMMAND_SENT) {
+    ESP_LOGW(TAG, "Send original command for pending request");
+    switch (request) {
+      case PendingMotionRequest::OPEN:
+        this->send_command_("FULL OPEN");
+        break;
+      case PendingMotionRequest::CLOSE:
+        this->send_command_("FULL CLOSE");
+        break;
+      case PendingMotionRequest::PED_OPEN:
+        this->send_command_("PED OPEN");
+        break;
+      default:
+        break;
+    }
+    this->pending_motion_state_ = PendingMotionState::ORIGINAL_COMMAND_SENT;
+    return;
+  }
+
+  // Waiting after original command is sent
 }
 
 }  // namespace cb19_gate
