@@ -37,6 +37,19 @@ enum class LearnMode : uint8_t {
   CLEAR_REMOTE
 };
 
+enum class PendingMotionRequest : uint8_t {
+  NONE = 0,
+  OPEN,
+  CLOSE,
+  PED_OPEN
+};
+
+enum class PendingMotionState : uint8_t {
+  NO_COMMAND_SENT = 0,
+  REVERSE_COMMAND_SENT,
+  ORIGINAL_COMMAND_SENT,
+};
+
 class CB19PedestrianButton : public button::Button {
  public:
   void set_parent(CB19GateComponent *parent) { this->parent_ = parent; }
@@ -317,6 +330,7 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   void maybe_poll_learn_status_();
   void handle_learn_status_ack_(const std::string &payload);
   void set_learn_status_(const std::string &status, bool active);
+  void check_motion_state_workaround_();
 
   std::string buffer_;
   bool has_frame_{false};
@@ -365,6 +379,11 @@ class CB19GateComponent : public Component, public uart::UARTDevice {
   uint32_t learn_started_at_{0};
   uint32_t last_learn_poll_time_{0};
   bool power_save_enabled_temp_{false};
+  
+  // Motion state workaround members
+  PendingMotionRequest pending_motion_request_{PendingMotionRequest::NONE};
+  PendingMotionState pending_motion_state_{PendingMotionState::NO_COMMAND_SENT};
+  uint32_t pending_motion_request_time_{0};
 
   CB19PedestrianButton *pedestrian_button_{nullptr};
   CB19OpenButton *open_button_{nullptr};
